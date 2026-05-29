@@ -152,6 +152,12 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
       <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">將所有資料下載為 JSON 備份檔</div>
       <button class="btn btn-primary btn-block" onclick="exportData()"><i class="ti ti-download"></i> 匯出資料</button>
     </div>
+    <div class="card" style="margin-top:8px">
+      <div style="font-weight:500;margin-bottom:6px">📦 封存客人記錄</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">已封存的客人訂單，可供查閱或一鍵清除</div>
+      <div id="archive-list"></div>
+      <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="clearAllArchived()"><i class="ti ti-trash"></i> 一鍵刪除全部封存</button>
+    </div>
   </div>
 
   <div id="page-shipping" class="page">
@@ -160,11 +166,11 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
   </div>
 
   <nav class="nav">
-    <button class="nav-btn active" onclick="showPage('products',this)"><i class="ti ti-package"></i>商品庫</button>
-    <button class="nav-btn" onclick="showPage('customers',this)"><i class="ti ti-users"></i>客人</button>
+    <button class="nav-btn active" onclick="showPage('customers',this)"><i class="ti ti-users"></i>客人</button>
     <button class="nav-btn" onclick="showPage('purchase',this)"><i class="ti ti-shopping-cart"></i>採購</button>
     <button class="nav-btn" onclick="showPage('payment',this)"><i class="ti ti-coin"></i>帳款</button>
     <button class="nav-btn" onclick="showPage('shipping',this)"><i class="ti ti-truck"></i>出貨</button>
+    <button class="nav-btn" onclick="showPage('products',this)"><i class="ti ti-package"></i>商品庫</button>
     <button class="nav-btn" onclick="showPage('settings',this)"><i class="ti ti-settings"></i>設定</button>
   </nav>
 </div>
@@ -237,6 +243,7 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <div class="modal-title" id="modal-order-title">新增訂單</div>
     <input type="hidden" id="order-cid">
     <div class="search-wrap"><i class="ti ti-search"></i><input type="text" id="order-search" placeholder="搜尋商品..." oninput="renderOrderProds()"></div>
+    <div id="order-cat-chips" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"></div>
     <div id="order-prod-list" style="max-height:300px;overflow-y:auto;margin-bottom:10px"></div>
     <div id="order-preview" style="margin-bottom:10px"></div>
     <div style="display:flex;gap:8px">
@@ -1094,6 +1101,10 @@ async function initDB() {
         purchaseState = d.purchaseState || {};
         itemChecked = d.itemChecked || {};
         shippingState = d.shippingState || {};
+        archivedProducts = d.archivedProducts || {};
+        archivedShipping = d.archivedShipping || {};
+        archivedOrders = d.archivedOrders || [];
+        archivedCustomers = d.archivedCustomers || {};
         dbReady = true;
         showSyncStatus("", "ok");
         renderAll();
@@ -1108,6 +1119,10 @@ async function initDB() {
     purchaseState = {};
     itemChecked = {};
     shippingState = {};
+    archivedProducts = {};
+    archivedShipping = {};
+    archivedOrders = [];
+    archivedCustomers = {};
     dbReady = false;
     renderAll();
   }
@@ -1115,7 +1130,7 @@ async function initDB() {
 
 async function saveAll() {
   try {
-    await setDoc(doc(db, "proxy", "data"), {products, customers, orders, payments, purchaseState, itemChecked, shippingState});
+    await setDoc(doc(db, "proxy", "data"), {products, customers, orders, payments, purchaseState, itemChecked, shippingState, archivedProducts, archivedShipping, archivedOrders, archivedCustomers});
     showSyncStatus("", "ok");
   } catch(e) {
     showSyncStatus("儲存失敗：" + e.message, "error");
@@ -1130,8 +1145,41 @@ async function forceSync() {
 
 function renderAll() {
   renderCatChips(); updateCatList();
-  renderProducts(); renderCustomers(); renderPurchase(); renderPayments(); renderShipping();
+  renderProducts(); renderCustomers(); renderPurchase(); renderPayments(); renderShipping(); renderArchiveList();
 }
+
+function renderArchiveList() {
+  const el=document.getElementById("archive-list");
+  if(!el)return;
+  const entries=Object.entries(archivedCustomers||{});
+  if(!entries.length){el.innerHTML='<div style="font-size:13px;color:var(--text-tertiary)">尚無封存記錄</div>';return}
+  el.innerHTML=entries.map(([cid,data])=>{
+    const c=data.customer||{};
+    const total=data.total||0;
+    const pay=data.payment||{};
+    const paid=pay.amount||0;
+    const discount=pay.discount||0;
+    return `<div class="card" style="margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div>
+          <span style="font-weight:700;color:var(--pink)">${c.code||'未知'}</span>
+          <span class="tag tag-${c.source||'其他'}" style="margin-left:6px">${c.source||''}</span>
+        </div>
+        <span style="font-size:11px;color:var(--text-tertiary)">${data.archivedAt?new Date(data.archivedAt).toLocaleDateString():''}</span>
+      </div>
+      ${(data.orders||[]).flatMap(o=>o.items).map(i=>{
+        const p=products.find(x=>x.id===i.pid);
+        return `<div style="font-size:12px;color:var(--text-secondary);padding:2px 0">${p?p.name:i.name} x${i.qty} — NT$${(i.price*i.qty).toLocaleString()}</div>`;
+      }).join('')}
+      <div style="margin-top:6px;font-size:13px;font-weight:500">合計 NT$${total.toLocaleString()} ${discount?`（折扣 -NT$${discount.toLocaleString()}）`:''} 已付 NT$${paid.toLocaleString()}</div>
+    </div>`;
+  }).join('');
+}
+window.clearAllArchived = async function() {
+  if(!confirm('確定刪除所有封存記錄？此操作不可復原'))return;
+  archivedCustomers={};
+  await saveAll(); renderArchiveList();
+};
 
 function showPage(id, btn) {
   document.querySelectorAll(".page").forEach(p=>{p.classList.remove("active");p.style.display="none";});
@@ -1142,6 +1190,7 @@ function showPage(id, btn) {
   if(id==="purchase") renderPurchase();
   if(id==="payment") renderPayments();
   if(id==="shipping") renderShipping();
+  if(id==="settings") renderArchiveList();
 }
 window.showPage = showPage;
 
@@ -1186,12 +1235,11 @@ function catTag(cat) {
 function renderProducts() {
   const q=(document.getElementById("prod-search").value||"").toLowerCase();
   const el=document.getElementById("prod-list");
-  let list=products.filter(p=>(activeCat==="all"||p.cat===activeCat)&&(!q||p.name.toLowerCase().includes(q)));
-  if(!list.length){el.innerHTML="<div style='text-align:center;padding:40px;color:var(--text-tertiary)'>沒有符合的商品</div>";return}
-  const byCat={};list.forEach(p=>{(byCat[p.cat]=byCat[p.cat]||[]).push(p)});
-  el.innerHTML=Object.entries(byCat).map(([cat,items])=>`
-    <div class="sec-title">${CAT_EMOJI[cat]||""} ${cat}</div>
-    ${items.map(p=>`<div class="card" style="border-left:3px solid ${CAT_COLOR[cat]||"#D4537E"}">
+  const activeList=products.filter(p=>!archivedProducts[p.id]&&(activeCat==="all"||p.cat===activeCat)&&(!q||p.name.toLowerCase().includes(q)));
+  const archivedList=products.filter(p=>archivedProducts[p.id]&&(activeCat==="all"||p.cat===activeCat)&&(!q||p.name.toLowerCase().includes(q)));
+
+  function prodCard(p, isArchived) {
+    return `<div class="card" style="border-left:3px solid ${CAT_COLOR[p.cat]||"#D4537E"}${isArchived?';opacity:0.65':''}">
       <div style="display:flex;align-items:center;gap:12px">
         ${p.img?`<img src="${p.img}" class="thumb-lg" onclick="openLight('${p.id}')" style="cursor:pointer" alt="">`:`<div class="thumb-ph" onclick="editProduct('${p.id}')"><i class="ti ti-photo-plus" style="font-size:22px;color:var(--text-tertiary)"></i></div>`}
         <div style="flex:1;min-width:0">
@@ -1203,12 +1251,41 @@ function renderProducts() {
           <div class="price-badge">NT$${p.price}</div>
           <div style="display:flex;gap:4px;margin-top:6px;justify-content:flex-end">
             <button class="btn btn-sm" onclick="editProduct('${p.id}')"><i class="ti ti-edit"></i></button>
+            <button class="btn btn-sm" onclick="toggleArchiveProduct('${p.id}')" style="color:${isArchived?'var(--green)':'var(--text-tertiary)'};border-color:${isArchived?'var(--green)':'var(--border-strong)'}"><i class="ti ti-${isArchived?'arrow-up':'archive'}" style="font-size:14px"></i></button>
             <button class="btn btn-sm btn-danger" onclick="delProduct('${p.id}')"><i class="ti ti-trash"></i></button>
           </div>
         </div>
       </div>
-    </div>`).join("")}`).join("");
+    </div>`;
+  }
+
+  const byCat={};
+  activeList.forEach(p=>{(byCat[p.cat]=byCat[p.cat]||[]).push(p)});
+  const activeHTML=Object.entries(byCat).map(([cat,items])=>`
+    <div class="sec-title">${CAT_EMOJI[cat]||""} ${cat}</div>
+    ${items.map(p=>prodCard(p,false)).join("")}`).join("");
+
+  const archivedByCat={};
+  archivedList.forEach(p=>{(archivedByCat[p.cat]=archivedByCat[p.cat]||[]).push(p)});
+  const archivedHTML=archivedList.length?`
+    <div style="margin-top:16px">
+      <button class="btn btn-sm" style="width:100%;justify-content:center;color:var(--text-tertiary)" onclick="document.getElementById('prod-archived').style.display=document.getElementById('prod-archived').style.display==='none'?'block':'none'">
+        <i class="ti ti-archive"></i> 收納區（${archivedList.length}）
+      </button>
+      <div id="prod-archived" style="display:none;margin-top:8px">
+        ${Object.entries(archivedByCat).map(([cat,items])=>`
+          <div class="sec-title">${CAT_EMOJI[cat]||""} ${cat}</div>
+          ${items.map(p=>prodCard(p,true)).join("")}`).join("")}
+      </div>
+    </div>`:"";
+
+  el.innerHTML=(activeHTML||"<div style='text-align:center;padding:40px;color:var(--text-tertiary)'>沒有符合的商品</div>")+archivedHTML;
 }
+window.toggleArchiveProduct = async function(pid) {
+  archivedProducts[pid]=!archivedProducts[pid];
+  if(!archivedProducts[pid])delete archivedProducts[pid];
+  await saveAll(); renderProducts();
+};
 window.openLight = function(pid) {
   const p=products.find(x=>x.id===pid); if(!p||!p.img)return;
   document.getElementById("lightbox-img").src=p.img;
@@ -1307,7 +1384,8 @@ function renderCustomers() {
         <div>
           <span style="font-weight:700;font-size:15px;color:${isCompleted?'var(--green)':'var(--pink)'}">${c.code}</span>
           <span class="tag tag-${c.source}" style="margin-left:8px">${c.source}</span>
-          ${isCompleted?`<button class="btn btn-sm" style="margin-left:8px;${notified?'background:var(--green);color:#fff;border-color:var(--green)':'color:var(--green);border-color:var(--green)'}" onclick="toggleNotified('${c.id}')">${notified?'✅ 已通知':'通知客人'}</button>`:''}
+          ${isCompleted?`<button class="btn btn-sm" style="margin-left:8px;${notified?'background:var(--green);color:#fff;border-color:var(--green)':'color:var(--green);border-color:var(--green)'}" onclick="toggleNotified('${c.id}')">${notified?'✅ 已通知':'通知客人'}</button>
+          <button class="btn btn-sm" style="color:var(--amber);border-color:var(--amber);margin-left:4px" onclick="archiveCustomer('${c.id}')"><i class="ti ti-archive"></i> 封存</button>`:''}
           ${c.name?`<div style="font-size:12px;color:var(--text-secondary);margin-top:3px">${c.name}</div>`:""}
         </div>
         <div style="display:flex;gap:6px">
@@ -1347,12 +1425,20 @@ function renderCustomers() {
     </div>`;
   }
 
-  const pending=customers.filter(c=>!isCustCompleted(c));
-  const completed=customers.filter(c=>isCustCompleted(c));
+  const pending=customers.filter(c=>!isCustCompleted(c)&&!archivedCustomers[c.id]);
+  const completed=customers.filter(c=>isCustCompleted(c)&&!archivedCustomers[c.id]);
 
   el.innerHTML=
     pending.map(c=>renderCustCard(c,false)).join("")+
-    (completed.length?`<div class="sec-title" style="color:var(--green);margin-top:20px">✅ 已完成分配（${completed.length}）</div>`+completed.map(c=>renderCustCard(c,true)).join(""):"");
+    (completed.length?`
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:20px;margin-bottom:8px">
+        <div class="sec-title" style="color:var(--green);margin:0">✅ 已完成分配（${completed.length}）</div>
+        <button class="btn btn-sm" onclick="collapsedCompleted=!collapsedCompleted;renderCustomers()" style="color:var(--green);border-color:var(--green)">
+          <i class="ti ti-${collapsedCompleted?'chevron-down':'chevron-up'}"></i> ${collapsedCompleted?'展開':'收起'}
+        </button>
+      </div>
+      ${collapsedCompleted?'':completed.map(c=>renderCustCard(c,true)).join("")}`
+    :"");
 }
 window.openAddCustomer = function() {
   document.getElementById("modal-customer-title").textContent="新增客人";
@@ -1379,6 +1465,21 @@ window.saveCustomer = async function() {
   await saveAll(); closeModal("modal-customer"); renderCustomers();
 };
 
+window.archiveCustomer = async function(cid) {
+  const c=customers.find(x=>x.id===cid);
+  if(!confirm(`確定封存「${c?c.code:'此客人'}」？封存後可在設定頁查看`))return;
+  const cOrds=orders.filter(o=>o.cid===cid);
+  const pay=payments.find(p=>p.cid===cid);
+  const total=cOrds.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.price*i.qty,0),0);
+  archivedCustomers[cid]={
+    customer:c,
+    orders:cOrds,
+    payment:pay,
+    total,
+    archivedAt:new Date().toISOString()
+  };
+  await saveAll(); renderCustomers(); renderPurchase(); renderPayments(); renderShipping();
+};
 window.toggleNotified = async function(cid) {
   const idx=payments.findIndex(p=>p.cid===cid);
   if(idx>=0){payments[idx].notified=!payments[idx].notified;}
@@ -1415,26 +1516,37 @@ window.openAddOrder = function(cid) {
 };
 function renderOrderProds() {
   const q=(document.getElementById("order-search").value||"").toLowerCase();
-  const el=document.getElementById("order-prod-list");
-  const list=products.filter(p=>!q||p.name.toLowerCase().includes(q));
-  el.innerHTML=list.map(p=>{
-    const it=orderItems[p.id];
-    return `<div style="padding:8px 4px;border-bottom:0.5px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:8px">
-        ${p.img?`<img src="${p.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:500">${p.name}</div>
-          <div style="display:flex;align-items:center;gap:4px;margin-top:2px">${catTag(p.cat)}</div>
+  const listEl=document.getElementById("order-prod-list");
+  const chipsEl=document.getElementById("order-cat-chips");
+  const filtered=products.filter(p=>!archivedProducts[p.id]&&(!q||p.name.toLowerCase().includes(q)));
+  const byCat={};
+  filtered.forEach(p=>{(byCat[p.cat]=byCat[p.cat]||[]).push(p)});
+  const cats=Object.keys(byCat);
+  // Render chips
+  if(chipsEl){
+    chipsEl.innerHTML=cats.map(cat=>`<span class="chip" style="font-size:11px;padding:3px 8px" onclick="document.getElementById('order-cat-${cat}')&&document.getElementById('order-cat-${cat}').scrollIntoView({behavior:'smooth'})">${CAT_EMOJI[cat]||'📦'} ${cat}</span>`).join('');
+  }
+  if(!filtered.length){listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-tertiary)">沒有商品</div>';return}
+  listEl.innerHTML=cats.map(cat=>`
+    <div id="order-cat-${cat}" style="font-size:11px;font-weight:700;color:var(--text-tertiary);letter-spacing:.6px;text-transform:uppercase;padding:8px 4px 4px">${CAT_EMOJI[cat]||'📦'} ${cat}</div>
+    ${byCat[cat].map(p=>{
+      const it=orderItems[p.id];
+      return `<div style="padding:8px 4px;border-bottom:0.5px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px">
+          ${p.img?`<img src="${p.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500">${p.name}</div>
+            <div style="display:flex;align-items:center;gap:4px;margin-top:2px">${catTag(p.cat)}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <input type="number" min="0" value="${it?it.qty:0}" data-pid="${p.id}" style="width:54px;margin:0;padding:6px;text-align:center" onchange="setOItem(this)">
+            <input type="number" placeholder="改價" data-pid-price="${p.id}" value="${it&&it.price!==p.price?it.price:''}" style="width:70px;margin:4px 0 0;padding:4px 6px;font-size:12px;text-align:center" onchange="setOItemPrice(this)">
+            <div style="font-size:11px;color:var(--pink);margin-top:1px">定價 NT$${p.price}</div>
+          </div>
         </div>
-        <div style="text-align:right;flex-shrink:0">
-          <input type="number" min="0" value="${it?it.qty:0}" data-pid="${p.id}" style="width:54px;margin:0;padding:6px;text-align:center" onchange="setOItem(this)">
-          <input type="number" placeholder="改價" data-pid-price="${p.id}" value="${it&&it.price!==p.price?it.price:''}" style="width:70px;margin:4px 0 0;padding:4px 6px;font-size:12px;text-align:center" onchange="setOItemPrice(this)">
-          <div style="font-size:11px;color:var(--pink);margin-top:1px">定價 NT$${p.price}</div>
-        </div>
-      </div>
-      <input type="text" placeholder="備註（許願內容）" data-pid-note="${p.id}" value="${it&&it.note?it.note:''}" style="margin:6px 0 0;padding:6px 10px;font-size:12px;color:var(--text-secondary)" oninput="setOItemNote(this)">
-    </div>`;
-  }).join("")||'<div style="text-align:center;padding:20px;color:var(--text-tertiary)">沒有商品</div>';
+        <input type="text" placeholder="備註（許願內容）" data-pid-note="${p.id}" value="${it&&it.note?it.note:''}" style="margin:6px 0 0;padding:6px 10px;font-size:12px;color:var(--text-secondary)" oninput="setOItemNote(this)">
+      </div>`;
+    }).join('')}`).join('');
 }
 window.renderOrderProds = renderOrderProds;
 window.setOItem = function(input) {
@@ -1482,32 +1594,38 @@ window.saveOrder = async function() {
 
 // ── PURCHASE ──
 // purchase state stored in memory (not synced, local session only)
-let purchaseState = {}; // key: pid|name -> {bought: 0, noteDone: {}}
-let itemChecked = {}; // key: cid_oid_idx -> true/false
-let shippingState = {}; // key: cid -> {ordered: bool, shipped: bool}
+let purchaseState = {};
+let itemChecked = {};
+let shippingState = {};
+let archivedProducts = {}; // pid -> true
+let collapsedCompleted = false; // customers completed section
+let archivedShipping = {}; // cid -> true (shipped+ordered archived)
+let archivedOrders = []; //封存的訂單記錄
+let archivedCustomers = []; // 封存的客人
 
 function renderPurchase() {
   const el=document.getElementById("purchase-list");
+  // Build item map: key -> {name, totalQty, img, notes: [{note, cid, oid, idx}]}
   const all={};
-  orders.forEach(o=>o.items.forEach(i=>{
+  orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((i,idx)=>{
     const p=products.find(x=>x.id===i.pid);
     const cat=p?p.cat:"其他";
     if(!all[cat])all[cat]={};
     const key=i.pid+"|"+(p?p.name:i.name);
     if(!all[cat][key])all[cat][key]={name:p?p.name:i.name,qty:0,img:p?p.img:"",notes:[]};
     all[cat][key].qty+=i.qty;
-    if(i.note)all[cat][key].notes.push(i.note);
+    if(i.note)all[cat][key].notes.push({note:i.note,cid:o.cid,oid:o.id,idx});
   }));
   if(!Object.keys(all).length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">還沒有任何訂單</div>';return}
   const catOrder=[...new Set(["樂天世界商品","楓之谷網咖","快閃店","其他",...Object.keys(all)])];
 
-  let pendingHTML="", doneHTML="";
+  let html="";
   catOrder.filter(c=>all[c]).forEach(cat=>{
     let catPending="", catDone="";
     Object.entries(all[cat]).forEach(([key,i])=>{
-      const st=purchaseState[key]||{bought:0,noteDone:false};
+      const st=purchaseState[key]||{bought:0,noteDone:{}};
       const remaining=i.qty-st.bought;
-      const isDone=remaining<=0;
+      const isDone=remaining<=0; // bought >= needed
       const row=`<div style="padding:10px 0;border-bottom:0.5px solid var(--border)">
         <div style="display:flex;align-items:center;gap:8px">
           ${i.img?`<img src="${i.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
@@ -1515,29 +1633,53 @@ function renderPurchase() {
           <span style="font-size:13px;font-weight:700;color:${CAT_COLOR[cat]||'var(--pink)'}">×${i.qty}</span>
         </div>
         ${i.notes.length?`<div style="margin-top:6px;margin-left:44px">
-          ${i.notes.map((n,ni)=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-            <input type="checkbox" ${(st.noteDone&&st.noteDone[ni])?"checked":""} onchange="toggleNoteDone('${key}',${ni},this.checked)" style="width:auto;margin:0;flex-shrink:0">
-            <span style="font-size:12px;color:var(--pink-dark);${(st.noteDone&&st.noteDone[ni])?'text-decoration:line-through;color:var(--text-tertiary)':''}">${n}</span>
-          </div>`).join("")}
+          ${i.notes.map((n,ni)=>{
+            const custName=customers.find(c=>c.id===n.cid);
+            const noteChecked=itemChecked[`${n.cid}_${n.oid}_${n.idx}`]||false;
+            return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+              <input type="checkbox" ${noteChecked?"checked":""} onchange="toggleItemCheckedFromPurchase('${n.cid}','${n.oid}',${n.idx},this.checked)" style="width:auto;margin:0;flex-shrink:0;accent-color:var(--green)">
+              <span style="font-size:12px;${noteChecked?'text-decoration:line-through;color:var(--text-tertiary)':'color:var(--pink-dark)'}">
+                ${custName?`<span style="color:var(--text-tertiary);font-size:11px">${custName.code}</span> `:''} ${n.note}
+              </span>
+            </div>`;
+          }).join("")}
         </div>`:""}
         <div style="display:flex;align-items:center;gap:8px;margin-top:6px;margin-left:44px">
           <span style="font-size:12px;color:var(--text-secondary)">已買</span>
-          <input type="number" min="0" max="${i.qty}" value="${st.bought}" style="width:54px;margin:0;padding:4px 6px;font-size:13px;text-align:center" onchange="setBought('${key}',this.value,'${i.qty}')">
+          <input type="number" min="0" value="${st.bought}" style="width:54px;margin:0;padding:4px 6px;font-size:13px;text-align:center" onchange="setBought('${key}',this.value)">
           <span style="font-size:12px;color:var(--text-secondary)">/ ${i.qty}</span>
           ${!isDone?`<span style="font-size:12px;color:var(--red)">還差 ${remaining}</span>`:`<span style="font-size:12px;color:var(--green)">✅ 完成</span>`}
         </div>
       </div>`;
       if(isDone)catDone+=row; else catPending+=row;
     });
-    if(catPending)pendingHTML+=`<div class="sec-title">${CAT_EMOJI[cat]||""} ${cat}</div><div class="card" style="border-left:3px solid ${CAT_COLOR[cat]||'var(--pink)'}">${catPending}</div>`;
-    if(catDone)doneHTML+=`<div class="sec-title" style="color:var(--green)">${CAT_EMOJI[cat]||""} ${cat}（已完成）</div><div class="card" style="border-left:3px solid var(--green);opacity:0.7">${catDone}</div>`;
+    const doneCount=catDone?catDone.split('border-bottom').length-1:0;
+    html+=`<div class="sec-title">${CAT_EMOJI[cat]||""} ${cat}</div>
+      <div class="card" style="border-left:3px solid ${CAT_COLOR[cat]||'var(--pink)'}">
+        ${catPending||`<div style="text-align:center;padding:8px;color:var(--text-tertiary);font-size:13px">此分類全部完成 ✅</div>`}
+      </div>
+      ${catDone?`<button class="btn btn-sm" style="width:100%;justify-content:center;color:var(--green);border-color:var(--green);margin-bottom:4px" onclick="togglePurchaseDone('${cat}')">
+        <i class="ti ti-archive"></i> 已完成收納（${doneCount}）
+      </button>
+      <div id="purchase-done-${cat}" style="display:none">
+        <div class="card" style="border-left:3px solid var(--green);opacity:0.7">${catDone}</div>
+      </div>`:""}`;
   });
-  el.innerHTML=(pendingHTML||'<div style="text-align:center;padding:20px;color:var(--text-tertiary)">所有品項已採購完畢！</div>')+doneHTML;
+  el.innerHTML=html||'<div style="text-align:center;padding:20px;color:var(--text-tertiary)">所有品項已採購完畢！</div>';
 }
-window.setBought = async function(key, val, total) {
+window.togglePurchaseDone = function(cat) {
+  const el=document.getElementById(`purchase-done-${cat}`);
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+};
+window.setBought = async function(key, val) {
   if(!purchaseState[key])purchaseState[key]={bought:0,noteDone:{}};
-  purchaseState[key].bought=Math.min(parseInt(val)||0, parseInt(total));
+  purchaseState[key].bought=Math.max(0,parseInt(val)||0);
   await saveAll(); renderPurchase();
+};
+window.toggleItemCheckedFromPurchase = async function(cid, oid, idx, checked) {
+  const key=`${cid}_${oid}_${idx}`;
+  itemChecked[key]=checked;
+  await saveAll(); renderCustomers(); renderPurchase();
 };
 window.toggleNoteDone = async function(key, idx, checked) {
   if(!purchaseState[key])purchaseState[key]={bought:0,noteDone:{}};
@@ -1619,12 +1761,20 @@ function renderShipping() {
   ['7-11','全家'].forEach(method=>{
     const list=groups[method];
     if(!list.length)return;
+    const active=list.filter(c=>{ const s=shippingState[c.id]||{}; return !(s.ordered&&s.shipped); });
+    const archived=list.filter(c=>{ const s=shippingState[c.id]||{}; return s.ordered&&s.shipped; });
     const sorted=[
-      ...list.filter(c=>{ const s=shippingState[c.id]||{}; return !s.ordered&&!s.shipped; }),
-      ...list.filter(c=>{ const s=shippingState[c.id]||{}; return s.ordered&&!s.shipped; }),
-      ...list.filter(c=>{ const s=shippingState[c.id]||{}; return s.shipped; }),
+      ...active.filter(c=>{ const s=shippingState[c.id]||{}; return !s.ordered; }),
+      ...active.filter(c=>{ const s=shippingState[c.id]||{}; return s.ordered&&!s.shipped; }),
     ];
-    html+=`<div class="sec-title">📦 ${method}</div>${sorted.map(custRow).join('')}`;
+    html+=`<div class="sec-title">📦 ${method}</div>
+      ${sorted.map(custRow).join('')}
+      ${archived.length?`<button class="btn btn-sm" style="width:100%;justify-content:center;color:var(--green);border-color:var(--green);margin-top:8px" onclick="document.getElementById('ship-archived-${method}').style.display=document.getElementById('ship-archived-${method}').style.display==='none'?'block':'none'">
+        <i class="ti ti-archive"></i> 已完成收納（${archived.length}）
+      </button>
+      <div id="ship-archived-${method}" style="display:none;margin-top:6px">
+        ${archived.map(custRow).join('')}
+      </div>`:''}`;
   });
   el.innerHTML=html;
 }
