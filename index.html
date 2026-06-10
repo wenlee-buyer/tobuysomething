@@ -1652,67 +1652,53 @@ let archivedCustomers = []; // 封存的客人
 
 function renderPurchase() {
   const el=document.getElementById("purchase-list");
-  // Build item map: key -> {name, totalQty, img, notes: [{note, cid, oid, idx}]}
   const all={};
   orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((i,idx)=>{
     const p=products.find(x=>x.id===i.pid);
     const cat=p?p.cat:"其他";
     if(!all[cat])all[cat]={};
     const key=i.pid+"|"+(p?p.name:i.name);
-    if(!all[cat][key])all[cat][key]={name:p?p.name:i.name,qty:0,img:p?p.img:"",notes:[]};
-    all[cat][key].qty+=i.qty;
-    if(i.note)all[cat][key].notes.push({note:i.note,cid:o.cid,oid:o.id,idx});
+    if(!all[cat][key])all[cat][key]={name:p?p.name:i.name,totalQty:0,img:p?p.img:"",notes:[]};
+    const checked=!!itemChecked[`${o.cid}_${o.id}_${idx}`];
+    if(!checked) all[cat][key].totalQty+=i.qty;
+    if(i.note)all[cat][key].notes.push({note:i.note,cid:o.cid,oid:o.id,idx,checked});
   }));
   if(!Object.keys(all).length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">還沒有任何訂單</div>';return}
   const catOrder=[...new Set(["樂天世界商品","楓之谷網咖","快閃店","其他",...Object.keys(all)])];
-
   let html="";
   catOrder.filter(c=>all[c]).forEach(cat=>{
     let catPending="", catDone="";
     Object.entries(all[cat]).forEach(([key,i])=>{
-      const st=purchaseState[key]||{bought:0,noteDone:{}};
-      const remaining=i.qty-st.bought;
-      const isDone=remaining<=0; // bought >= needed
-      const row=`<div style="padding:10px 0;border-bottom:0.5px solid var(--border)">
+      const isDone=i.totalQty<=0;
+      const row=`<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
         <div style="display:flex;align-items:center;gap:8px">
           ${i.img?`<img src="${i.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
-          <span style="flex:1;font-size:14px${isDone?';text-decoration:line-through;color:var(--text-tertiary)':''}">${i.name}</span>
-          <span style="font-size:13px;font-weight:700;color:${CAT_COLOR[cat]||'var(--pink)'}">×${i.qty}</span>
+          <span style="flex:1;font-size:14px${isDone?";text-decoration:line-through;color:var(--text-tertiary)":""}">${i.name}</span>
+          ${isDone
+            ?`<span style="font-size:12px;color:var(--green)">✅ 全配完</span>`
+            :`<span style="font-size:13px;font-weight:700;color:var(--red)">還需 ×${i.totalQty}</span>`}
         </div>
-        ${i.notes.length?`<div style="margin-top:6px;margin-left:44px">
-          ${i.notes.map((n,ni)=>{
+        ${i.notes.length?`<div style="margin-top:4px;margin-left:44px">
+          ${i.notes.map(n=>{
             const custName=customers.find(c=>c.id===n.cid);
-            const noteChecked=itemChecked[`${n.cid}_${n.oid}_${n.idx}`]||false;
-            return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-              <input type="checkbox" ${noteChecked?"checked":""} onchange="toggleItemCheckedFromPurchase('${n.cid}','${n.oid}',${n.idx},this.checked)" style="width:auto;margin:0;flex-shrink:0;accent-color:var(--green)">
-              <span style="font-size:12px;${noteChecked?'text-decoration:line-through;color:var(--text-tertiary)':'color:var(--pink-dark)'}">
-                ${custName?`<span style="color:var(--text-tertiary);font-size:11px">${custName.code}</span> `:''} ${n.note}
+            return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+              <input type="checkbox" ${n.checked?"checked":""} onchange="toggleItemCheckedFromPurchase('${n.cid}','${n.oid}',${n.idx},this.checked)" style="width:auto;margin:0;flex-shrink:0;accent-color:var(--green)">
+              <span style="font-size:12px;${n.checked?"text-decoration:line-through;color:var(--text-tertiary)":"color:var(--pink-dark)"}">
+                ${custName?`<span style="color:var(--text-tertiary);font-size:11px">${custName.code}</span> `:""}${n.note}
               </span>
             </div>`;
           }).join("")}
         </div>`:""}
-        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;margin-left:44px">
-          <span style="font-size:12px;color:var(--text-secondary)">已買</span>
-          <input type="number" min="0" value="${st.bought}" style="width:54px;margin:0;padding:4px 6px;font-size:13px;text-align:center" onchange="setBought('${key}',this.value)">
-          <span style="font-size:12px;color:var(--text-secondary)">/ ${i.qty}</span>
-          ${!isDone?`<span style="font-size:12px;color:var(--red)">還差 ${remaining}</span>`:`<span style="font-size:12px;color:var(--green)">✅ 完成</span>`}
-        </div>
       </div>`;
       if(isDone)catDone+=row; else catPending+=row;
     });
-    const doneCount=catDone?catDone.split('border-bottom').length-1:0;
+    const doneCount=catDone?catDone.split("border-bottom").length-1:0;
     html+=`<div class="sec-title">${CAT_EMOJI[cat]||""} ${cat}</div>
       ${catPending
-        ? `<div class="card" style="border-left:3px solid ${CAT_COLOR[cat]||'var(--pink)'};">${catPending}</div>`
-        : `<div style="border-left:3px solid ${CAT_COLOR[cat]||'var(--pink)'};background:var(--card);border-radius:var(--radius);border:0.5px solid var(--border);padding:4px 10px;margin-bottom:8px;text-align:right;font-size:11px;color:var(--text-tertiary)">此分類全部完成 ✅</div>`
+        ?`<div class="card" style="border-left:3px solid ${CAT_COLOR[cat]||"var(--pink)"};">${catPending}</div>`
+        :`<div style="border-left:3px solid ${CAT_COLOR[cat]||"var(--pink)"};background:var(--card);border-radius:var(--radius);border:0.5px solid var(--border);padding:4px 10px;margin-bottom:8px;text-align:right;font-size:11px;color:var(--text-tertiary)">此分類全部完成 ✅</div>`
       }
       ${catDone?`<div style="text-align:right;margin-top:2px"><button class="btn btn-sm" style="font-size:11px;padding:2px 8px;color:var(--green);border-color:var(--green)" onclick="togglePurchaseDone('${cat}')">已完成 ${doneCount} ▾</button></div><div id="purchase-done-${cat}" style="display:none"><div class="card" style="border-left:3px solid var(--green);opacity:0.7">${catDone}</div></div>`:""}`;
-
-
-
-
-
-
   });
   el.innerHTML=html||'<div style="text-align:center;padding:20px;color:var(--text-tertiary)">所有品項已採購完畢！</div>';
 }
@@ -1720,11 +1706,7 @@ window.togglePurchaseDone = function(cat) {
   const el=document.getElementById(`purchase-done-${cat}`);
   if(el)el.style.display=el.style.display==='none'?'block':'none';
 };
-window.setBought = async function(key, val) {
-  if(!purchaseState[key])purchaseState[key]={bought:0,noteDone:{}};
-  purchaseState[key].bought=Math.max(0,parseInt(val)||0);
-  await saveAll(); renderPurchase();
-};
+
 window.toggleItemCheckedFromPurchase = async function(cid, oid, idx, checked) {
   const key=`${cid}_${oid}_${idx}`;
   itemChecked[key]=checked;
