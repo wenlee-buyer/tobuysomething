@@ -142,33 +142,23 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <div id="payment-list"></div>
   </div>
 
-  <nav class="nav">
-    <button class="nav-btn active" id="nav-customers-btn" onclick="showPage('customers',this)"><i class="ti ti-users"></i>客人</button>
-    <button class="nav-btn" onclick="showPage('purchase',this)"><i class="ti ti-shopping-cart"></i>採購</button>
-    <button class="nav-btn" onclick="showPage('payment',this)"><i class="ti ti-coin"></i>帳款出貨</button>
-    <button class="nav-btn" onclick="showPage('ledger',this)"><i class="ti ti-calculator"></i>記帳</button>
-    <button class="nav-btn" onclick="showPage('products',this)"><i class="ti ti-package"></i>商品庫</button>
-    <button class="nav-btn" onclick="showPage('settings',this)"><i class="ti ti-settings"></i>設定</button>
-  </nav>
-</div>
-
-<div id="page-ledger" class="page" style="display:none;padding:16px">
-  <div class="page-header">
-    <h1>記帳</h1>
-    <button class="btn btn-sm btn-primary" onclick="openAddLedger()"><i class="ti ti-plus"></i> 新增</button>
+  <div id="page-ledger" class="page" style="display:none;padding:16px">
+    <div class="page-header">
+      <h1>記帳</h1>
+      <button class="btn btn-sm btn-primary" onclick="openAddLedger()"><i class="ti ti-plus"></i> 新增</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
+      <input type="date" id="ledger-from" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
+      <span style="font-size:12px;color:var(--text-secondary)">～</span>
+      <input type="date" id="ledger-to" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
+      <button class="btn btn-sm" onclick="clearLedgerFilter()" style="font-size:11px;white-space:nowrap">清除</button>
+    </div>
+    <div id="ledger-summary" style="margin-bottom:12px"></div>
+    <div id="ledger-list"></div>
   </div>
-  <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
-    <input type="date" id="ledger-from" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
-    <span style="font-size:12px;color:var(--text-secondary)">～</span>
-    <input type="date" id="ledger-to" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
-    <button class="btn btn-sm" onclick="clearLedgerFilter()" style="font-size:11px;white-space:nowrap">清除</button>
-  </div>
-  <div id="ledger-summary" style="margin-bottom:12px"></div>
-  <div id="ledger-list"></div>
-</div>
 
-<!-- Settings Page -->
-<div id="page-settings" class="page" style="display:none;padding:16px">
+  <!-- Settings Page -->
+  <div id="page-settings" class="page" style="display:none;padding:16px">
   <div class="page-header"><h1>設定</h1></div>
   <div class="card">
     <div style="font-weight:500;margin-bottom:4px">同步狀態</div>
@@ -204,6 +194,16 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <div id="archive-list"></div>
     <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="clearAllArchived()"><i class="ti ti-trash"></i> 一鍵刪除全部封存</button>
   </div>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-btn active" id="nav-customers-btn" onclick="showPage('customers',this)"><i class="ti ti-users"></i>客人</button>
+    <button class="nav-btn" onclick="showPage('purchase',this)"><i class="ti ti-shopping-cart"></i>採購</button>
+    <button class="nav-btn" onclick="showPage('payment',this)"><i class="ti ti-coin"></i>帳款出貨</button>
+    <button class="nav-btn" onclick="showPage('ledger',this)"><i class="ti ti-calculator"></i>記帳</button>
+    <button class="nav-btn" onclick="showPage('products',this)"><i class="ti ti-package"></i>商品庫</button>
+    <button class="nav-btn" onclick="showPage('settings',this)"><i class="ti ti-settings"></i>設定</button>
+  </nav>
 </div>
 
 <div class="modal-overlay" id="modal-ledger">
