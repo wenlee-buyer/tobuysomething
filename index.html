@@ -133,6 +133,12 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
 
   <div id="page-payment" class="page">
     <div class="page-header"><h1>帳款出貨</h1></div>
+    <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
+      <input type="date" id="pay-from" style="flex:1;margin:0;font-size:12px" onchange="renderPayments()">
+      <span style="font-size:12px;color:var(--text-secondary)">～</span>
+      <input type="date" id="pay-to" style="flex:1;margin:0;font-size:12px" onchange="renderPayments()">
+      <button class="btn btn-sm" onclick="clearPayFilter()" style="font-size:11px;white-space:nowrap">清除</button>
+    </div>
     <div id="payment-list"></div>
   </div>
 
@@ -140,9 +146,25 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <button class="nav-btn active" id="nav-customers-btn" onclick="showPage('customers',this)"><i class="ti ti-users"></i>客人</button>
     <button class="nav-btn" onclick="showPage('purchase',this)"><i class="ti ti-shopping-cart"></i>採購</button>
     <button class="nav-btn" onclick="showPage('payment',this)"><i class="ti ti-coin"></i>帳款出貨</button>
+    <button class="nav-btn" onclick="showPage('ledger',this)"><i class="ti ti-calculator"></i>記帳</button>
     <button class="nav-btn" onclick="showPage('products',this)"><i class="ti ti-package"></i>商品庫</button>
     <button class="nav-btn" onclick="showPage('settings',this)"><i class="ti ti-settings"></i>設定</button>
   </nav>
+</div>
+
+<div id="page-ledger" class="page" style="display:none;padding:16px">
+  <div class="page-header">
+    <h1>記帳</h1>
+    <button class="btn btn-sm btn-primary" onclick="openAddLedger()"><i class="ti ti-plus"></i> 新增</button>
+  </div>
+  <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
+    <input type="date" id="ledger-from" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
+    <span style="font-size:12px;color:var(--text-secondary)">～</span>
+    <input type="date" id="ledger-to" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
+    <button class="btn btn-sm" onclick="clearLedgerFilter()" style="font-size:11px;white-space:nowrap">清除</button>
+  </div>
+  <div id="ledger-summary" style="margin-bottom:12px"></div>
+  <div id="ledger-list"></div>
 </div>
 
 <!-- Settings Page -->
@@ -181,6 +203,28 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">已封存的客人訂單，可供查閱或一鍵清除</div>
     <div id="archive-list"></div>
     <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="clearAllArchived()"><i class="ti ti-trash"></i> 一鍵刪除全部封存</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-ledger">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-ledger-title">新增記帳</div>
+    <input type="hidden" id="edit-ledger-id">
+    <label>日期</label><input type="date" id="l-date">
+    <label>分類</label>
+    <select id="l-cat">
+      <option value="運費">運費</option>
+      <option value="商品">商品</option>
+      <option value="手續費">手續費</option>
+      <option value="其他">其他</option>
+    </select>
+    <label>名目</label><input type="text" id="l-name" placeholder="例：韓國EMS運費">
+    <label>金額 (NT$)</label><input type="number" id="l-amount" placeholder="0">
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn" style="flex:1" onclick="closeModal('modal-ledger')">取消</button>
+      <button class="btn btn-primary" style="flex:1" onclick="saveLedger()">儲存</button>
+    </div>
   </div>
 </div>
 
@@ -1142,6 +1186,7 @@ async function initDB() {
         archivedShipping = d.archivedShipping || {};
         archivedOrders = d.archivedOrders || [];
         archivedCustomers = d.archivedCustomers || {};
+        ledgerEntries = d.ledgerEntries || [];
         dbReady = true;
         showSyncStatus("", "ok");
         renderAll();
@@ -1160,6 +1205,7 @@ async function initDB() {
     archivedShipping = {};
     archivedOrders = [];
     archivedCustomers = {};
+    ledgerEntries = [];
     dbReady = false;
     renderAll();
   }
@@ -1167,7 +1213,7 @@ async function initDB() {
 
 async function saveAll() {
   try {
-    await setDoc(doc(db, "proxy", "data"), {products, customers, orders, payments, purchaseState, itemChecked, shippingState, archivedProducts, archivedShipping, archivedOrders, archivedCustomers});
+    await setDoc(doc(db, "proxy", "data"), {products, customers, orders, payments, purchaseState, itemChecked, shippingState, archivedProducts, archivedShipping, archivedOrders, archivedCustomers, ledgerEntries});
     showSyncStatus("", "ok");
   } catch(e) {
     showSyncStatus("儲存失敗：" + e.message, "error");
@@ -1189,7 +1235,7 @@ window.saveTracking = async function(cid, val) {
 
 function renderAll() {
   renderCatChips(); updateCatList();
-  renderProducts(); renderCustomers(); renderPurchase(); renderPayments(); renderArchiveList();
+  renderProducts(); renderCustomers(); renderPurchase(); renderPayments(); renderLedger(); renderArchiveList();
 }
 
 function renderArchiveList() {
@@ -1197,27 +1243,33 @@ function renderArchiveList() {
   if(!el)return;
   const entries=Object.entries(archivedCustomers||{});
   if(!entries.length){el.innerHTML='<div style="font-size:13px;color:var(--text-tertiary)">尚無封存記錄</div>';return}
-  el.innerHTML=entries.map(([cid,data])=>{
+  const cards=entries.map(([cid,data])=>{
     const c=data.customer||{};
     const total=data.total||0;
     const pay=data.payment||{};
     const paid=pay.amount||0;
     const discount=pay.discount||0;
     const items=(data.orders||[]).flatMap(o=>o.items);
-    return `<div class="card" style="margin-bottom:6px;padding:10px 12px">
+    return `<div class="card" style="margin-bottom:6px;padding:8px 10px">
       <div style="display:flex;align-items:center;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
         <span style="font-weight:600;color:var(--pink);font-size:13px;flex:1">${c.code||'未知'}</span>
         <span class="tag tag-${c.source||'其他'}" style="margin-right:8px">${c.source||''}</span>
-        <span style="font-size:12px;color:var(--text-secondary);margin-right:8px">NT$${(total-discount).toLocaleString()}</span>
+        <span style="font-size:12px;color:var(--text-secondary);margin-right:6px">NT$${(total-discount).toLocaleString()}</span>
         <span style="font-size:11px;color:var(--text-tertiary)">${data.archivedAt?new Date(data.archivedAt).toLocaleDateString():''} ▾</span>
       </div>
-      <div style="display:none;margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border)">
-        ${items.map(i=>{const p=products.find(x=>x.id===i.pid);return `<div style="font-size:12px;color:var(--text-secondary);padding:2px 0">${p?p.name:i.name} x${i.qty} — NT$${(i.price*i.qty).toLocaleString()}</div>`;}).join('')}
-        <div style="margin-top:6px;font-size:12px;font-weight:500">${discount?`折扣 -NT$${discount.toLocaleString()}　`:''}已付 NT$${paid.toLocaleString()}</div>
+      <div style="display:none;margin-top:6px;padding-top:6px;border-top:0.5px solid var(--border)">
+        ${items.map(i=>{const p=products.find(x=>x.id===i.pid);return `<div style="font-size:12px;color:var(--text-secondary);padding:1px 0">${p?p.name:i.name} x${i.qty} — NT$${(i.price*i.qty).toLocaleString()}</div>`;}).join('')}
+        <div style="margin-top:4px;font-size:12px;font-weight:500">${discount?`折扣 -NT$${discount.toLocaleString()}　`:''}已付 NT$${paid.toLocaleString()}</div>
       </div>
     </div>`;
   }).join('');
+  el.innerHTML=`
+    <button class="btn btn-sm" style="width:100%;justify-content:center;color:var(--text-secondary);margin-bottom:6px" onclick="toggleEl('archive-entries')">
+      封存記錄（${entries.length} 筆）▾
+    </button>
+    <div id="archive-entries" style="display:none">${cards}</div>`;
 }
+
 window.clearAllArchived = async function() {
   if(!confirm('確定刪除所有封存記錄？此操作不可復原'))return;
   archivedCustomers={};
@@ -1232,6 +1284,7 @@ function showPage(id, btn) {
   btn.classList.add("active");
   if(id==="purchase") renderPurchase();
   if(id==="payment") renderPayments();
+  if(id==="ledger") renderLedger();
   if(id==="settings") renderArchiveList();
 }
 window.showPage = showPage;
@@ -1522,7 +1575,7 @@ window.archiveCustomer = async function(cid) {
     total,
     archivedAt:new Date().toISOString()
   };
-  await saveAll(); renderCustomers(); renderPurchase(); renderPayments(); renderShipping();
+  await saveAll(); renderCustomers(); renderPurchase(); renderPayments();
 };
 window.toggleNotified = async function(cid) {
   const idx=payments.findIndex(p=>p.cid===cid);
@@ -1648,11 +1701,12 @@ window.saveOrder = async function() {
 let purchaseState = {};
 let itemChecked = {};
 let shippingState = {};
-let archivedProducts = {}; // pid -> true
-let collapsedCompleted = false; // customers completed section
-let archivedShipping = {}; // cid -> true (shipped+ordered archived)
-let archivedOrders = []; //封存的訂單記錄
-let archivedCustomers = []; // 封存的客人
+let archivedProducts = {};
+let collapsedCompleted = false;
+let archivedShipping = {};
+let archivedOrders = [];
+let archivedCustomers = [];
+let ledgerEntries = [];
 
 function renderPurchase() {
   const el=document.getElementById("purchase-list");
@@ -1670,7 +1724,10 @@ function renderPurchase() {
   if(!Object.keys(all).length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">還沒有任何訂單</div>';return}
   const catOrder=[...new Set(["樂天世界商品","楓之谷網咖","快閃店","其他",...Object.keys(all)])];
   let html="";
-  catOrder.filter(c=>all[c]).forEach(cat=>{
+  // Sort: cats with pending items first, fully done cats last
+  const catsWithPending=catOrder.filter(c=>all[c]&&Object.values(all[c]).some(i=>i.totalQty>0));
+  const catsDone=catOrder.filter(c=>all[c]&&Object.values(all[c]).every(i=>i.totalQty<=0));
+  [...catsWithPending,...catsDone].forEach(cat=>{
     let catPending="", catDone="";
     Object.entries(all[cat]).forEach(([key,i])=>{
       const isDone=i.totalQty<=0;
@@ -1817,8 +1874,12 @@ function renderShipping() {
 window.toggleShipping = async function(cid, field, checked) {
   if(!shippingState[cid])shippingState[cid]={ordered:false,shipped:false};
   shippingState[cid][field]=checked;
-  if(field==='shipped'&&checked)shippingState[cid].ordered=true;
-  await saveAll(); renderShipping();
+  if(field==='shipped'&&checked){
+    shippingState[cid].ordered=true;
+    shippingState[cid].shippedAt=new Date().toISOString();
+  }
+  if(field==='shipped'&&!checked) delete shippingState[cid].shippedAt;
+  await saveAll(); renderPayments();
 };
 window.toggleShipDetail = function(cid) {
   const detail=document.getElementById('ship-detail-'+cid);
@@ -1833,8 +1894,18 @@ function renderPayments() {
   const el=document.getElementById("payment-list");
   if(!customers.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">還沒有客人</div>';return}
 
+  const fromVal=document.getElementById("pay-from")?.value||"";
+  const toVal=document.getElementById("pay-to")?.value||"";
+  const fromD=fromVal?new Date(fromVal):null;
+  const toD=toVal?new Date(toVal+"T23:59:59"):null;
+
+  // Stats: filter by shipped date range if set, else all
   let grand=0,grandPaid=0,grandKrw=0,grandTwd=0;
   customers.forEach(c=>{
+    const st=shippingState[c.id]||{};
+    const shippedAt=st.shippedAt?new Date(st.shippedAt):null;
+    const inRange=(!fromD&&!toD)||(st.shipped&&shippedAt&&(!fromD||shippedAt>=fromD)&&(!toD||shippedAt<=toD));
+    if(!inRange&&(fromD||toD))return;
     const cOrds=orders.filter(o=>o.cid===c.id);
     const pay=payments.find(p=>p.cid===c.id);
     const total=cOrds.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.price*i.qty,0),0);
@@ -1891,16 +1962,27 @@ function renderPayments() {
   const sources=['LINE','FB','Threads','其他'];
   const bySrc={};
   customers.forEach(c=>{(bySrc[c.source]=bySrc[c.source]||[]).push(c)});
-  const srcRows=sources.filter(s=>bySrc[s]&&bySrc[s].length).map(s=>`
-    <div class="sec-title">${s}</div>
-    ${bySrc[s].map(custRow).join("")}
-  `).join("");
+
+  let srcRows="";
+  sources.filter(s=>bySrc[s]&&bySrc[s].length).forEach(s=>{
+    const active=bySrc[s].filter(c=>{ const st=shippingState[c.id]||{}; return !st.shipped; });
+    const shipped=bySrc[s].filter(c=>{ const st=shippingState[c.id]||{}; return st.shipped; });
+    const activeRows=active.map(custRow).join("");
+    const shippedRows=shipped.map(custRow).join("");
+    srcRows+=`<div class="sec-title">${s}</div>
+      ${activeRows||""}
+      ${shippedRows?`<div style="text-align:right;margin:4px 0">
+        <button class="btn btn-sm" style="font-size:11px;padding:2px 8px;color:var(--green);border-color:var(--green)" onclick="toggleEl('shipped-${s}')">已出貨 ${shipped.length} ▾</button>
+      </div>
+      <div id="shipped-${s}" style="display:none">${shippedRows}</div>`:""}`;
+  });
 
   const gr=grand-grandPaid;
   const profit=grand-grandTwd;
+  const rangeLabel=fromVal||toVal?` （${fromVal||""}～${toVal||""}）`:"";
   el.innerHTML=`
     <div class="card" style="border-left:3px solid var(--pink);margin-bottom:12px">
-      <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:var(--pink)">📊 本次全單合計</div>
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:var(--pink)">📊 統計${rangeLabel}</div>
       <div class="stat-grid">
         <div class="stat-box" style="background:var(--gray)"><div class="lbl">總韓元</div><div class="val" style="font-size:13px">₩${grandKrw.toLocaleString()}</div></div>
         <div class="stat-box" style="background:var(--gray)"><div class="lbl">台幣換算</div><div class="val" style="font-size:13px">NT$${grandTwd.toLocaleString()}</div></div>
@@ -1915,6 +1997,16 @@ function renderPayments() {
     ${srcRows||'<div style="text-align:center;padding:20px;color:var(--text-tertiary)">還沒有客人</div>'}
   `;
 }
+window.clearPayFilter = function() {
+  document.getElementById("pay-from").value="";
+  document.getElementById("pay-to").value="";
+  renderPayments();
+};
+window.toggleEl = function(id) {
+  const el=document.getElementById(id);
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+};
+
 window.openPayModal = function(cid) {
   const c=customers.find(x=>x.id===cid);
   const cOrds=orders.filter(o=>o.cid===cid);
@@ -2082,6 +2174,75 @@ function openModal(id){document.getElementById(id).classList.add("open")}
 function closeModal(id){document.getElementById(id).classList.remove("open")}
 window.closeModal = closeModal;
 window.openModal = openModal;
+
+// ── LEDGER ──
+function renderLedger() {
+  const el=document.getElementById("ledger-list");
+  const sumEl=document.getElementById("ledger-summary");
+  if(!el)return;
+  const fromVal=document.getElementById("ledger-from")?.value||"";
+  const toVal=document.getElementById("ledger-to")?.value||"";
+  const fromD=fromVal?new Date(fromVal):null;
+  const toD=toVal?new Date(toVal+"T23:59:59"):null;
+  const filtered=ledgerEntries.filter(e=>{
+    if(!fromD&&!toD)return true;
+    const d=new Date(e.date);
+    return (!fromD||d>=fromD)&&(!toD||d<=toD);
+  }).sort((a,b)=>b.date.localeCompare(a.date));
+  // Summary
+  const cats=['運費','商品','手續費','其他'];
+  const totals={};
+  let grandTotal=0;
+  filtered.forEach(e=>{totals[e.cat]=(totals[e.cat]||0)+e.amount; grandTotal+=e.amount;});
+  sumEl.innerHTML=filtered.length?`<div class="card" style="border-left:3px solid var(--pink);margin-bottom:8px">
+    <div style="font-weight:700;font-size:13px;color:var(--pink);margin-bottom:8px">支出統計${fromVal||toVal?` （${fromVal||""}～${toVal||""}）`:""}</div>
+    <div class="stat-grid">
+      ${cats.filter(c=>totals[c]).map(c=>`<div class="stat-box" style="background:var(--gray)"><div class="lbl">${c}</div><div class="val" style="font-size:14px">NT$${totals[c].toLocaleString()}</div></div>`).join("")}
+    </div>
+    <div style="margin-top:8px;font-size:13px;font-weight:700">總計 NT$${grandTotal.toLocaleString()}</div>
+  </div>`:"";
+  if(!filtered.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">沒有記帳記錄</div>';return}
+  el.innerHTML=filtered.map(e=>`<div class="card" style="padding:8px 10px;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:500">${e.name}</div>
+      <div style="font-size:11px;color:var(--text-tertiary)">${e.date} · ${e.cat}</div>
+    </div>
+    <div style="font-size:14px;font-weight:700;color:var(--red)">-NT$${e.amount.toLocaleString()}</div>
+    <button class="btn btn-sm btn-danger" style="padding:3px 7px" onclick="deleteLedger('${e.id}')"><i class="ti ti-trash"></i></button>
+  </div>`).join("");
+}
+window.openAddLedger = function() {
+  document.getElementById("modal-ledger-title").textContent="新增記帳";
+  document.getElementById("edit-ledger-id").value="";
+  document.getElementById("l-date").value=new Date().toISOString().slice(0,10);
+  document.getElementById("l-cat").value="運費";
+  document.getElementById("l-name").value="";
+  document.getElementById("l-amount").value="";
+  openModal("modal-ledger");
+};
+window.saveLedger = async function() {
+  const id=document.getElementById("edit-ledger-id").value;
+  const data={
+    id:id||"l"+Date.now(),
+    date:document.getElementById("l-date").value,
+    cat:document.getElementById("l-cat").value,
+    name:document.getElementById("l-name").value.trim(),
+    amount:parseFloat(document.getElementById("l-amount").value)||0,
+  };
+  if(!data.name||!data.amount)return;
+  if(id){const i=ledgerEntries.findIndex(x=>x.id===id);if(i>=0)ledgerEntries[i]=data}
+  else ledgerEntries.push(data);
+  await saveAll(); closeModal("modal-ledger"); renderLedger();
+};
+window.deleteLedger = async function(id) {
+  ledgerEntries=ledgerEntries.filter(e=>e.id!==id);
+  await saveAll(); renderLedger();
+};
+window.clearLedgerFilter = function() {
+  document.getElementById("ledger-from").value="";
+  document.getElementById("ledger-to").value="";
+  renderLedger();
+};
 
 // INIT
 initDB();
