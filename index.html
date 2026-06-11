@@ -69,6 +69,7 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
 .tag-LINE{background:var(--green-light);color:#0F6E56}
 .tag-FB{background:#E6F1FB;color:#185FA5}
 .tag-IG{background:var(--orange-light);color:#993C1D}
+.tag-Threads{background:#F0F0F0;color:#111111}
 .tag-其他{background:var(--gray);color:var(--text-secondary)}
 .tag-lotte{background:var(--pink-light);color:var(--pink-dark)}
 .tag-maple{background:var(--green-light);color:#085041}
@@ -131,61 +132,56 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
   </div>
 
   <div id="page-payment" class="page">
-    <div class="page-header"><h1>帳款總表</h1></div>
+    <div class="page-header"><h1>帳款出貨</h1></div>
     <div id="payment-list"></div>
   </div>
 
-  <div id="page-settings" class="page">
-    <div class="page-header"><h1>設定</h1></div>
-    <div class="card">
-      <div style="font-weight:500;margin-bottom:4px">同步狀態</div>
-      <div id="settings-sync" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">載入中...</div>
-      <button class="btn btn-primary btn-block" onclick="forceSync()"><i class="ti ti-refresh"></i> 強制重新同步</button>
-    </div>
-    <div class="card" style="margin-top:8px">
-      <div style="font-weight:500;margin-bottom:6px">壓縮所有商品圖片</div>
-      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">把所有現有圖片重新壓縮變小，解決儲存超限問題</div>
-      <button class="btn btn-primary btn-block" onclick="recompressAll()"><i class="ti ti-photo-edit"></i> 立即壓縮</button>
-    </div>
-    <div class="card" style="margin-top:8px">
-      <div style="font-weight:500;margin-bottom:6px">修改類別名稱</div>
-      <div style="display:flex;gap:6px;margin-bottom:8px">
-        <input type="text" id="cat-old" placeholder="原類別名稱" style="flex:1;margin:0">
-        <input type="text" id="cat-new" placeholder="新類別名稱" style="flex:1;margin:0">
-      </div>
-      <button class="btn btn-primary btn-block" onclick="renameCategory()"><i class="ti ti-edit"></i> 確認修改</button>
-    </div>
-    <div class="card" style="margin-top:8px">
-      <div style="font-weight:500;margin-bottom:6px">匯入新商品</div>
-      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">將本次新增的26項楓之谷網咖商品匯入資料庫（已有的商品不會重複）</div>
-      <button class="btn btn-primary btn-block" onclick="importNewProducts()"><i class="ti ti-database-plus"></i> 一鍵匯入新商品</button>
-    </div>
-    <div class="card" style="margin-top:8px">
-      <div style="font-weight:500;margin-bottom:6px">匯出備份</div>
-      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">將所有資料下載為 JSON 備份檔</div>
-      <button class="btn btn-primary btn-block" onclick="exportData()"><i class="ti ti-download"></i> 匯出資料</button>
-    </div>
-    <div class="card" style="margin-top:8px">
-      <div style="font-weight:500;margin-bottom:6px">📦 封存客人記錄</div>
-      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">已封存的客人訂單，可供查閱或一鍵清除</div>
-      <div id="archive-list"></div>
-      <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="clearAllArchived()"><i class="ti ti-trash"></i> 一鍵刪除全部封存</button>
-    </div>
-  </div>
-
-  <div id="page-shipping" class="page">
-    <div class="page-header"><h1>出貨管理</h1></div>
-    <div id="shipping-list"></div>
-  </div>
-
   <nav class="nav">
-    <button class="nav-btn active" onclick="showPage('customers',this)"><i class="ti ti-users"></i>客人</button>
+    <button class="nav-btn active" id="nav-customers-btn" onclick="showPage('customers',this)"><i class="ti ti-users"></i>客人</button>
     <button class="nav-btn" onclick="showPage('purchase',this)"><i class="ti ti-shopping-cart"></i>採購</button>
-    <button class="nav-btn" onclick="showPage('payment',this)"><i class="ti ti-coin"></i>帳款</button>
-    <button class="nav-btn" onclick="showPage('shipping',this)"><i class="ti ti-truck"></i>出貨</button>
+    <button class="nav-btn" onclick="showPage('payment',this)"><i class="ti ti-coin"></i>帳款出貨</button>
     <button class="nav-btn" onclick="showPage('products',this)"><i class="ti ti-package"></i>商品庫</button>
     <button class="nav-btn" onclick="showPage('settings',this)"><i class="ti ti-settings"></i>設定</button>
   </nav>
+</div>
+
+<!-- Settings Page -->
+<div id="page-settings" class="page" style="display:none;padding:16px">
+  <div class="page-header"><h1>設定</h1></div>
+  <div class="card">
+    <div style="font-weight:500;margin-bottom:4px">同步狀態</div>
+    <div id="settings-sync" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">載入中...</div>
+    <button class="btn btn-primary btn-block" onclick="forceSync()"><i class="ti ti-refresh"></i> 強制重新同步</button>
+  </div>
+  <div class="card" style="margin-top:8px">
+    <div style="font-weight:500;margin-bottom:6px">壓縮所有商品圖片</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">把所有現有圖片重新壓縮變小，解決儲存超限問題</div>
+    <button class="btn btn-primary btn-block" onclick="recompressAll()"><i class="ti ti-photo-edit"></i> 立即壓縮</button>
+  </div>
+  <div class="card" style="margin-top:8px">
+    <div style="font-weight:500;margin-bottom:6px">修改類別名稱</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <input type="text" id="cat-old" placeholder="原類別名稱" style="flex:1;margin:0">
+      <input type="text" id="cat-new" placeholder="新類別名稱" style="flex:1;margin:0">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="renameCategory()"><i class="ti ti-edit"></i> 確認修改</button>
+  </div>
+  <div class="card" style="margin-top:8px">
+    <div style="font-weight:500;margin-bottom:6px">匯入新商品</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">將本次新增的26項楓之谷網咖商品匯入資料庫（已有的商品不會重複）</div>
+    <button class="btn btn-primary btn-block" onclick="importNewProducts()"><i class="ti ti-database-plus"></i> 一鍵匯入新商品</button>
+  </div>
+  <div class="card" style="margin-top:8px">
+    <div style="font-weight:500;margin-bottom:6px">匯出備份</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">將所有資料下載為 JSON 備份檔</div>
+    <button class="btn btn-primary btn-block" onclick="exportData()"><i class="ti ti-download"></i> 匯出資料</button>
+  </div>
+  <div class="card" style="margin-top:8px">
+    <div style="font-weight:500;margin-bottom:6px">📦 封存客人記錄</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">已封存的客人訂單，可供查閱或一鍵清除</div>
+    <div id="archive-list"></div>
+    <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="clearAllArchived()"><i class="ti ti-trash"></i> 一鍵刪除全部封存</button>
+  </div>
 </div>
 
 <!-- Modals -->
@@ -218,7 +214,7 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
       <div style="font-size:13px;font-weight:500;color:var(--pink);margin-bottom:10px">🛒 同時開單給新客人</div>
       <label>客人代號</label><input type="text" id="p-cust-code" placeholder="例：小美">
       <label>來源平台</label>
-      <select id="p-cust-source"><option>LINE</option><option>FB</option><option>IG</option><option>其他</option></select>
+      <select id="p-cust-source"><option>LINE</option><option>FB</option><option>Threads</option><option>其他</option></select>
       <label>數量</label><input type="number" id="p-order-qty" value="1" min="1">
       <label>品項備註（許願內容）</label><input type="text" id="p-order-note" placeholder="例：要粉紅色">
     </div>
@@ -240,7 +236,7 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <input type="hidden" id="edit-cid">
     <label>代號</label><input type="text" id="c-code" placeholder="例：小美、阿志">
     <label>來源平台</label>
-    <select id="c-source"><option>LINE</option><option>FB</option><option>IG</option><option>其他</option></select>
+    <select id="c-source"><option>LINE</option><option>FB</option><option>Threads</option><option>其他</option></select>
     <label>備註</label><input type="text" id="c-note">
     <div style="display:flex;gap:8px;margin-top:6px">
       <button class="btn" style="flex:1" onclick="closeModal('modal-customer')">取消</button>
@@ -274,6 +270,8 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <label>實際已付金額 (NT$)</label><input type="number" id="pay-amount" placeholder="0">
     <label>出貨方式</label>
     <select id="pay-shipping"><option value="">未選</option><option value="7-11">7-11</option><option value="全家">全家</option></select>
+    <label>出貨單號</label>
+    <input type="text" id="pay-tracking" placeholder="輸入出貨單號">
     <label>折扣金額 (NT$)</label><input type="number" id="pay-discount" placeholder="0（輸入優惠折扣）">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
       <input type="checkbox" id="pay-notified" style="width:auto;margin:0">
@@ -1182,9 +1180,16 @@ async function forceSync() {
   await initDB();
 }
 
+window.saveTracking = async function(cid, val) {
+  const idx=payments.findIndex(p=>p.cid===cid);
+  if(idx>=0)payments[idx].tracking=val;
+  else payments.push({cid,amount:0,shipping:"",tracking:val,discount:0,notified:false,note:""});
+  await saveAll();
+};
+
 function renderAll() {
   renderCatChips(); updateCatList();
-  renderProducts(); renderCustomers(); renderPurchase(); renderPayments(); renderShipping(); renderArchiveList();
+  renderProducts(); renderCustomers(); renderPurchase(); renderPayments(); renderArchiveList();
 }
 
 function renderArchiveList() {
@@ -1227,7 +1232,6 @@ function showPage(id, btn) {
   btn.classList.add("active");
   if(id==="purchase") renderPurchase();
   if(id==="payment") renderPayments();
-  if(id==="shipping") renderShipping();
   if(id==="settings") renderArchiveList();
 }
 window.showPage = showPage;
@@ -1829,14 +1833,7 @@ function renderPayments() {
   const el=document.getElementById("payment-list");
   if(!customers.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">還沒有客人</div>';return}
 
-  // Only customers WITHOUT shipping method
-  const noShipping=customers.filter(c=>{
-    const pay=payments.find(p=>p.cid===c.id);
-    return !pay||!pay.shipping;
-  });
-
   let grand=0,grandPaid=0,grandKrw=0,grandTwd=0;
-  // Calculate grand totals from ALL customers
   customers.forEach(c=>{
     const cOrds=orders.filter(o=>o.cid===c.id);
     const pay=payments.find(p=>p.cid===c.id);
@@ -1857,32 +1854,43 @@ function renderPayments() {
     const paid=pay?pay.amount:0;
     const discount=pay?pay.discount||0:0;
     const notified=pay?pay.notified||false:false;
+    const tracking=pay?pay.tracking||"":"";
     const actual=total-discount;
     const remain=Math.max(0,actual-paid);
+    const st=shippingState[c.id]||{ordered:false,shipped:false};
     if(!total)return"";
     const paidFull=paid>=actual&&actual>0;
     const paidPartial=paid>0&&paid<actual;
     const bc=paidFull?"var(--green)":paidPartial?"var(--amber)":"var(--red)";
     return `<div class="card" style="padding:10px 12px;border-left:3px solid ${bc};margin-bottom:6px">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <span style="font-weight:700;color:var(--pink);min-width:60px">${c.code}</span>
+        <span style="font-weight:700;color:var(--pink)">${c.code}</span>
         ${notified?'<span style="font-size:11px;color:var(--green)">✅已通知</span>':''}
         <button class="btn btn-sm" onclick="openPayModal('${c.id}')" style="margin-left:auto;color:var(--pink);border-color:var(--pink);padding:3px 8px"><i class="ti ti-edit"></i></button>
       </div>
-      <div style="display:flex;gap:10px;margin-top:8px;font-size:12px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;margin-top:6px;font-size:12px;flex-wrap:wrap">
         <span>應付 <strong>NT$${actual.toLocaleString()}</strong></span>
         ${discount?`<span style="color:var(--green)">折 -NT$${discount.toLocaleString()}</span>`:""}
         <span style="color:${paid>0?"var(--green)":"var(--text-tertiary)"}">已付 <strong>NT$${paid.toLocaleString()}</strong></span>
         <span style="color:${remain>0?"var(--red)":"var(--green)"}">待付 <strong>${remain>0?"NT$"+remain.toLocaleString():"已結清"}</strong></span>
-        <span style="color:var(--text-tertiary)">訂金 NT$${Math.ceil(actual*0.5).toLocaleString()}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;margin-top:8px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+          <input type="checkbox" ${st.ordered?'checked':''} onchange="toggleShipping('${c.id}','ordered',this.checked)" style="width:18px;height:18px;cursor:pointer;accent-color:var(--amber);flex-shrink:0">
+          已開單
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+          <input type="checkbox" ${st.shipped?'checked':''} onchange="toggleShipping('${c.id}','shipped',this.checked)" style="width:18px;height:18px;cursor:pointer;accent-color:var(--green);flex-shrink:0">
+          已出貨
+        </label>
+        ${st.shipped?`<input type="text" value="${tracking}" placeholder="出貨單號" onchange="saveTracking('${c.id}',this.value)" style="flex:1;margin:0;padding:4px 8px;font-size:12px">`:''}
       </div>
     </div>`;
   }
 
-  // Group by source
-  const sources=['LINE','FB','IG','其他'];
+  const sources=['LINE','FB','Threads','其他'];
   const bySrc={};
-  noShipping.forEach(c=>{(bySrc[c.source]=bySrc[c.source]||[]).push(c)});
+  customers.forEach(c=>{(bySrc[c.source]=bySrc[c.source]||[]).push(c)});
   const srcRows=sources.filter(s=>bySrc[s]&&bySrc[s].length).map(s=>`
     <div class="sec-title">${s}</div>
     ${bySrc[s].map(custRow).join("")}
@@ -1904,7 +1912,7 @@ function renderPayments() {
         <span style="color:${gr>0?"var(--red)":"var(--green)"}">待收 <strong>${gr>0?"NT$"+gr.toLocaleString():"全收清"}</strong></span>
       </div>
     </div>
-    ${srcRows||'<div style="text-align:center;padding:20px;color:var(--text-tertiary)">所有客人都已選擇出貨方式</div>'}
+    ${srcRows||'<div style="text-align:center;padding:20px;color:var(--text-tertiary)">還沒有客人</div>'}
   `;
 }
 window.openPayModal = function(cid) {
@@ -1916,23 +1924,25 @@ window.openPayModal = function(cid) {
   document.getElementById("modal-pay-title").textContent=(c?c.code:"")+" — 付款記錄";
   document.getElementById("pay-amount").value=pay?pay.amount:"";
   document.getElementById("pay-shipping").value=pay?pay.shipping||"":"";
+  document.getElementById("pay-tracking").value=pay?pay.tracking||"":"";
   document.getElementById("pay-discount").value=pay?pay.discount||"":"";
   document.getElementById("pay-notified").checked=pay?pay.notified||false:false;
   document.getElementById("pay-note").value=pay?pay.note:"";
   const discount=pay?pay.discount||0:0;
-  document.getElementById("pay-summary").innerHTML=`<div style="background:var(--pink-light);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--pink-dark)">訂單總額：<strong>NT$${total.toLocaleString()}</strong>${discount?`　折扣：<strong>-NT$${discount.toLocaleString()}</strong>　實收：<strong>NT$${(total-discount).toLocaleString()}</strong>`:""}　建議訂金：<strong>NT$${Math.ceil((total-discount)*0.5).toLocaleString()}</strong></div>`;
+  document.getElementById("pay-summary").innerHTML=`<div style="background:var(--pink-light);border-radius:var(--radius-sm);padding:10px;font-size:13px;color:var(--pink-dark)">訂單總額：<strong>NT$${total.toLocaleString()}</strong>${discount?`　折扣：<strong>-NT$${discount.toLocaleString()}</strong>　實收：<strong>NT$${(total-discount).toLocaleString()}</strong>`:""}　建議訂金：<strong>NT$${Math.ceil((total-discount)*0.5).toLocaleString()}</strong></div>`;
   openModal("modal-pay");
 };
 window.savePayment = async function() {
   const cid=document.getElementById("pay-cid").value;
   const amount=parseFloat(document.getElementById("pay-amount").value)||0;
   const shipping=document.getElementById("pay-shipping").value;
+  const tracking=document.getElementById("pay-tracking").value.trim();
   const discount=parseFloat(document.getElementById("pay-discount").value)||0;
   const notified=document.getElementById("pay-notified").checked;
   const note=document.getElementById("pay-note").value.trim();
   const idx=payments.findIndex(p=>p.cid===cid);
-  if(idx>=0)payments[idx]={cid,amount,shipping,discount,notified,note};
-  else payments.push({cid,amount,shipping,discount,notified,note});
+  if(idx>=0)payments[idx]={cid,amount,shipping,tracking,discount,notified,note};
+  else payments.push({cid,amount,shipping,tracking,discount,notified,note});
   await saveAll(); closeModal("modal-pay"); renderCustomers(); renderPayments();
 };
 
