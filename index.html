@@ -1561,7 +1561,9 @@ window.saveCustomer = async function() {
 };
 
 window.toggleCompletedCollapse = function() {
-  collapsedCompleted=!collapsedCompleted; renderCustomers();
+  collapsedCompleted=!collapsedCompleted;
+  localStorage.setItem('collapsedCompleted', collapsedCompleted);
+  renderCustomers();
 };
 window.archiveCustomer = async function(cid) {
   const c=customers.find(x=>x.id===cid);
@@ -1702,7 +1704,7 @@ let purchaseState = {};
 let itemChecked = {};
 let shippingState = {};
 let archivedProducts = {};
-let collapsedCompleted = false;
+let collapsedCompleted = localStorage.getItem('collapsedCompleted') === 'true';
 let archivedShipping = {};
 let archivedOrders = [];
 let archivedCustomers = [];
