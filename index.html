@@ -150,26 +150,24 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <button class="nav-btn" onclick="showPage('products',this)"><i class="ti ti-package"></i>商品庫</button>
     <button class="nav-btn" onclick="showPage('settings',this)"><i class="ti ti-settings"></i>設定</button>
   </nav>
-</div>
 
-<div id="page-ledger" class="page" style="display:none;padding:16px">
-  <div class="page-header">
-    <h1>記帳</h1>
-    <button class="btn btn-sm btn-primary" onclick="openAddLedger()"><i class="ti ti-plus"></i> 新增</button>
+  <div id="page-ledger" class="page" style="padding:16px">
+    <div class="page-header">
+      <h1>記帳</h1>
+      <button class="btn btn-sm btn-primary" onclick="openAddLedger()"><i class="ti ti-plus"></i> 新增</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
+      <input type="date" id="ledger-from" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
+      <span style="font-size:12px;color:var(--text-secondary)">～</span>
+      <input type="date" id="ledger-to" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
+      <button class="btn btn-sm" onclick="clearLedgerFilter()" style="font-size:11px;white-space:nowrap">清除</button>
+    </div>
+    <div id="ledger-summary" style="margin-bottom:12px"></div>
+    <div id="ledger-list"></div>
   </div>
-  <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
-    <input type="date" id="ledger-from" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
-    <span style="font-size:12px;color:var(--text-secondary)">～</span>
-    <input type="date" id="ledger-to" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
-    <button class="btn btn-sm" onclick="clearLedgerFilter()" style="font-size:11px;white-space:nowrap">清除</button>
-  </div>
-  <div id="ledger-summary" style="margin-bottom:12px"></div>
-  <div id="ledger-list"></div>
-</div>
 
-<!-- Settings Page -->
-<div id="page-settings" class="page" style="display:none;padding:16px">
-  <div class="page-header"><h1>設定</h1></div>
+  <div id="page-settings" class="page" style="padding:16px">
+    <div class="page-header"><h1>設定</h1></div>
   <div class="card">
     <div style="font-weight:500;margin-bottom:4px">同步狀態</div>
     <div id="settings-sync" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">載入中...</div>
@@ -205,6 +203,7 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="clearAllArchived()"><i class="ti ti-trash"></i> 一鍵刪除全部封存</button>
   </div>
 </div>
+</div><!-- end .app -->
 
 <div class="modal-overlay" id="modal-ledger">
   <div class="modal-sheet">
@@ -1933,12 +1932,32 @@ function renderPayments() {
     const paidFull=paid>=actual&&actual>0;
     const paidPartial=paid>0&&paid<actual;
     const bc=paidFull?"var(--green)":paidPartial?"var(--amber)":"var(--red)";
+    // Build item list
+    const allItems=cOrds.flatMap(o=>o.items);
+    const itemRows=allItems.map(i=>{
+      const p=products.find(x=>x.id===i.pid);
+      const img=p&&p.img?`<img src="${p.img}" style="width:32px;height:32px;object-fit:cover;border-radius:4px;flex-shrink:0">`:`<div style="width:32px;height:32px;border-radius:4px;background:var(--gray);flex-shrink:0"></div>`;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
+        ${img}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:500;line-height:1.3">${i.name}</div>
+          ${i.note?`<div style="font-size:11px;color:var(--text-tertiary)">${i.note}</div>`:""}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:12px;font-weight:600">x${i.qty}</div>
+          <div style="font-size:11px;color:var(--text-secondary)">NT$${(i.price*i.qty).toLocaleString()}</div>
+        </div>
+      </div>`;
+    }).join("");
+    const uid=`items-${c.id}`;
     return `<div class="card" style="padding:10px 12px;border-left:3px solid ${bc};margin-bottom:6px">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <span style="font-weight:700;color:var(--pink)">${c.code}</span>
         ${notified?'<span style="font-size:11px;color:var(--green)">✅已通知</span>':''}
+        <button class="btn btn-sm" onclick="toggleEl('${uid}')" style="font-size:11px;padding:2px 7px;color:var(--text-secondary)">品項 ${allItems.length} ▾</button>
         <button class="btn btn-sm" onclick="openPayModal('${c.id}')" style="margin-left:auto;color:var(--pink);border-color:var(--pink);padding:3px 8px"><i class="ti ti-edit"></i></button>
       </div>
+      <div id="${uid}" style="display:none;margin-top:6px;padding-top:4px">${itemRows}</div>
       <div style="display:flex;gap:8px;margin-top:6px;font-size:12px;flex-wrap:wrap">
         <span>應付 <strong>NT$${actual.toLocaleString()}</strong></span>
         ${discount?`<span style="color:var(--green)">折 -NT$${discount.toLocaleString()}</span>`:""}
