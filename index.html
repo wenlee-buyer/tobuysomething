@@ -142,23 +142,33 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <div id="payment-list"></div>
   </div>
 
-  <div id="page-ledger" class="page" style="display:none;padding:16px">
-    <div class="page-header">
-      <h1>記帳</h1>
-      <button class="btn btn-sm btn-primary" onclick="openAddLedger()"><i class="ti ti-plus"></i> 新增</button>
-    </div>
-    <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
-      <input type="date" id="ledger-from" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
-      <span style="font-size:12px;color:var(--text-secondary)">～</span>
-      <input type="date" id="ledger-to" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
-      <button class="btn btn-sm" onclick="clearLedgerFilter()" style="font-size:11px;white-space:nowrap">清除</button>
-    </div>
-    <div id="ledger-summary" style="margin-bottom:12px"></div>
-    <div id="ledger-list"></div>
-  </div>
+  <nav class="nav">
+    <button class="nav-btn active" id="nav-customers-btn" onclick="showPage('customers',this)"><i class="ti ti-users"></i>客人</button>
+    <button class="nav-btn" onclick="showPage('purchase',this)"><i class="ti ti-shopping-cart"></i>採購</button>
+    <button class="nav-btn" onclick="showPage('payment',this)"><i class="ti ti-coin"></i>帳款出貨</button>
+    <button class="nav-btn" onclick="showPage('ledger',this)"><i class="ti ti-calculator"></i>記帳</button>
+    <button class="nav-btn" onclick="showPage('products',this)"><i class="ti ti-package"></i>商品庫</button>
+    <button class="nav-btn" onclick="showPage('settings',this)"><i class="ti ti-settings"></i>設定</button>
+  </nav>
+</div>
 
-  <!-- Settings Page -->
-  <div id="page-settings" class="page" style="display:none;padding:16px">
+<div id="page-ledger" class="page" style="display:none;padding:16px">
+  <div class="page-header">
+    <h1>記帳</h1>
+    <button class="btn btn-sm btn-primary" onclick="openAddLedger()"><i class="ti ti-plus"></i> 新增</button>
+  </div>
+  <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
+    <input type="date" id="ledger-from" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
+    <span style="font-size:12px;color:var(--text-secondary)">～</span>
+    <input type="date" id="ledger-to" style="flex:1;margin:0;font-size:12px" onchange="renderLedger()">
+    <button class="btn btn-sm" onclick="clearLedgerFilter()" style="font-size:11px;white-space:nowrap">清除</button>
+  </div>
+  <div id="ledger-summary" style="margin-bottom:12px"></div>
+  <div id="ledger-list"></div>
+</div>
+
+<!-- Settings Page -->
+<div id="page-settings" class="page" style="display:none;padding:16px">
   <div class="page-header"><h1>設定</h1></div>
   <div class="card">
     <div style="font-weight:500;margin-bottom:4px">同步狀態</div>
@@ -166,9 +176,9 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <button class="btn btn-primary btn-block" onclick="forceSync()"><i class="ti ti-refresh"></i> 強制重新同步</button>
   </div>
   <div class="card" style="margin-top:8px">
-    <div style="font-weight:500;margin-bottom:6px">壓縮所有商品圖片</div>
-    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">把所有現有圖片重新壓縮變小，解決儲存超限問題</div>
-    <button class="btn btn-primary btn-block" onclick="recompressAll()"><i class="ti ti-photo-edit"></i> 立即壓縮</button>
+    <div style="font-weight:500;margin-bottom:6px">遷移圖片到 Cloudinary</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">把舊的 base64 圖片上傳到 Cloudinary，解決 Firebase 1MB 超限問題</div>
+    <button class="btn btn-primary btn-block" onclick="recompressAll()"><i class="ti ti-cloud-upload"></i> 立即遷移</button>
   </div>
   <div class="card" style="margin-top:8px">
     <div style="font-weight:500;margin-bottom:6px">修改類別名稱</div>
@@ -194,16 +204,6 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <div id="archive-list"></div>
     <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="clearAllArchived()"><i class="ti ti-trash"></i> 一鍵刪除全部封存</button>
   </div>
-  </div>
-
-  <nav class="nav">
-    <button class="nav-btn active" id="nav-customers-btn" onclick="showPage('customers',this)"><i class="ti ti-users"></i>客人</button>
-    <button class="nav-btn" onclick="showPage('purchase',this)"><i class="ti ti-shopping-cart"></i>採購</button>
-    <button class="nav-btn" onclick="showPage('payment',this)"><i class="ti ti-coin"></i>帳款出貨</button>
-    <button class="nav-btn" onclick="showPage('ledger',this)"><i class="ti ti-calculator"></i>記帳</button>
-    <button class="nav-btn" onclick="showPage('products',this)"><i class="ti ti-package"></i>商品庫</button>
-    <button class="nav-btn" onclick="showPage('settings',this)"><i class="ti ti-settings"></i>設定</button>
-  </nav>
 </div>
 
 <div class="modal-overlay" id="modal-ledger">
@@ -1561,9 +1561,7 @@ window.saveCustomer = async function() {
 };
 
 window.toggleCompletedCollapse = function() {
-  collapsedCompleted=!collapsedCompleted;
-  localStorage.setItem('collapsedCompleted', collapsedCompleted);
-  renderCustomers();
+  collapsedCompleted=!collapsedCompleted; renderCustomers();
 };
 window.archiveCustomer = async function(cid) {
   const c=customers.find(x=>x.id===cid);
@@ -1704,7 +1702,7 @@ let purchaseState = {};
 let itemChecked = {};
 let shippingState = {};
 let archivedProducts = {};
-let collapsedCompleted = localStorage.getItem('collapsedCompleted') === 'true';
+let collapsedCompleted = false;
 let archivedShipping = {};
 let archivedOrders = [];
 let archivedCustomers = [];
@@ -2065,28 +2063,34 @@ window.addScanProduct = async function() {
 };
 
 // ── UTILS ──
+const CLOUDINARY_CLOUD = "dkuseooqg";
+const CLOUDINARY_PRESET = "proxy_upload";
 let currentEditImg = "";
+
+async function uploadToCloudinary(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_PRESET);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, {
+    method: "POST",
+    body: formData
+  });
+  const data = await res.json();
+  if (!data.secure_url) throw new Error(data.error?.message || "上傳失敗");
+  return data.secure_url;
+}
 
 window.handleImg = function(inp,prev,dat) {
   const f=document.getElementById(inp).files[0]; if(!f)return;
-  const imgEl=new Image();
-  const reader=new FileReader();
-  reader.onload=e=>{
-    imgEl.onload=()=>{
-      const MAX=400;
-      let w=imgEl.width, h=imgEl.height;
-      if(w>MAX||h>MAX){ if(w>h){h=Math.round(h*MAX/w);w=MAX}else{w=Math.round(w*MAX/h);h=MAX} }
-      const canvas=document.createElement("canvas");
-      canvas.width=w; canvas.height=h;
-      canvas.getContext("2d").drawImage(imgEl,0,0,w,h);
-      const compressed=canvas.toDataURL("image/jpeg",0.4);
-      if(dat==="p-img") currentEditImg=compressed;
-      else document.getElementById(dat).value=compressed;
-      document.getElementById(prev).innerHTML=`<img src="${compressed}" style="max-width:100%;max-height:140px;border-radius:8px;object-fit:cover">`;
-    };
-    imgEl.src=e.target.result;
-  };
-  reader.readAsDataURL(f);
+  const prevEl=document.getElementById(prev);
+  prevEl.innerHTML=`<div style="color:var(--text-tertiary);font-size:12px">上傳中...</div>`;
+  uploadToCloudinary(f).then(url=>{
+    if(dat==="p-img") currentEditImg=url;
+    else document.getElementById(dat).value=url;
+    prevEl.innerHTML=`<img src="${url}" style="max-width:100%;max-height:140px;border-radius:8px;object-fit:cover">`;
+  }).catch(err=>{
+    prevEl.innerHTML=`<div style="color:var(--red);font-size:12px">上傳失敗：${err.message}</div>`;
+  });
 };
 window.exportData = function() {
   const data={products,customers,orders,payments,exportedAt:new Date().toISOString()};
@@ -2148,28 +2152,24 @@ window.importNewProducts = async function() {
   alert(`成功匯入 ${toAdd.length} 項商品！`);
 };
 window.recompressAll = async function() {
-  const withImg = products.filter(p=>p.img&&p.img.length>100);
-  if(!withImg.length){alert('沒有需要壓縮的圖片');return}
-  if(!confirm(`將壓縮 ${withImg.length} 張圖片，確定嗎？`))return;
-  let done=0;
-  for(const p of withImg){
-    await new Promise(resolve=>{
-      const imgEl=new Image();
-      imgEl.onload=()=>{
-        const MAX=400;
-        let w=imgEl.width,h=imgEl.height;
-        if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX}else{w=Math.round(w*MAX/h);h=MAX}}
-        const canvas=document.createElement('canvas');
-        canvas.width=w;canvas.height=h;
-        canvas.getContext('2d').drawImage(imgEl,0,0,w,h);
-        p.img=canvas.toDataURL('image/jpeg',0.4);
-        done++;resolve();
-      };
-      imgEl.src=p.img;
-    });
+  const withBase64 = products.filter(p=>p.img&&p.img.startsWith("data:"));
+  if(!withBase64.length){alert('所有圖片已是 Cloudinary URL，無需遷移！');return}
+  if(!confirm(`將遷移 ${withBase64.length} 張 base64 圖片到 Cloudinary，請確保網路正常，確定嗎？`))return;
+  let done=0, failed=0;
+  for(const p of withBase64){
+    try {
+      const res=await fetch(p.img);
+      const blob=await res.blob();
+      const file=new File([blob],"product.jpg",{type:"image/jpeg"});
+      p.img=await uploadToCloudinary(file);
+      done++;
+    } catch(e) {
+      console.error("遷移失敗:", p.name, e);
+      failed++;
+    }
   }
   await saveAll();
-  alert(`完成！已壓縮 ${done} 張圖片`);
+  alert(`完成！成功 ${done} 張${failed?`，失敗 ${failed} 張`:""}。`);
   renderProducts();
 };
 function openModal(id){document.getElementById(id).classList.add("open")}
