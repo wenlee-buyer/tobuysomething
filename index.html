@@ -1837,6 +1837,10 @@ function renderOrderProds() {
           </div>
         </div>
         ${isChecked?`<div style="margin-top:6px;margin-left:26px">
+          ${p.salePrice?`<div style="display:flex;gap:6px;margin-bottom:6px">
+            <button class="btn btn-sm" style="font-size:11px;padding:2px 10px;${!orderItems[p.id]||orderItems[p.id].price===p.price?'background:var(--pink);color:#fff;border-color:var(--pink)':'color:var(--text-secondary)'}" onclick="setPriceMode('${p.id}','normal')">定 NT$${p.price}</button>
+            <button class="btn btn-sm" style="font-size:11px;padding:2px 10px;${orderItems[p.id]&&orderItems[p.id].price===p.salePrice?'background:var(--green);color:#fff;border-color:var(--green)':'color:var(--text-secondary)'}" onclick="setPriceMode('${p.id}','sale')">優 NT$${p.salePrice}</button>
+          </div>`:''}
           ${hasVariants?p.variants.map(v=>{
             const key=`${p.id}|${v.name}`;
             const it=orderItems[key];
@@ -1901,6 +1905,22 @@ function getVariantRows() {
   });
   return Object.values(map).filter(v=>v.name);
 }
+
+window.setPriceMode = function(pid, mode) {
+  const p=products.find(x=>x.id===pid); if(!p)return;
+  const price=mode==='sale'&&p.salePrice?p.salePrice:p.price;
+  // 更新這個商品所有 orderItems（有款式的每款、無款式的直接）
+  const p2=products.find(x=>x.id===pid);
+  if(p2&&p2.variants&&p2.variants.length){
+    p2.variants.forEach(v=>{
+      const key=`${pid}|${v.name}`;
+      if(orderItems[key]) orderItems[key].price=price;
+    });
+  } else {
+    if(orderItems[pid]) orderItems[pid].price=price;
+  }
+  renderOrderProds(); renderOrderPreview();
+};
 
 window.toggleOrderItem = function(pid, checked) {
   const p=products.find(x=>x.id===pid); if(!p)return;
