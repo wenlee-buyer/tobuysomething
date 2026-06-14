@@ -2134,21 +2134,24 @@ let ledgerEntries = [];
 
 function renderPurchase() {
   const el=document.getElementById("purchase-list");
-  const shortages = {};
 
+  // 收集所有 pid|variantName SKU（排除封存+全打勾客人）
   const skus = new Set();
   orders.filter(o=>!archivedCustomers[o.cid]&&!isCustAllCheckedGlobal(o.cid)).forEach(o=>o.items.forEach(item=>{
     const p=products.find(x=>x.id===item.pid); if(!p)return;
     if(item.variants&&item.variants.length){
-      item.variants.forEach(v=>skus.add(`${item.pid}|${v.name}`));
+      item.variants.forEach(v=>skus.add(`${item.pid}||${v.name}`));
     } else {
-      skus.add(`${item.pid}|${item.note||""}`);
+      skus.add(`${item.pid}||${item.note||""}`);
     }
   }));
 
+  // 以商品為單位，收集缺口
+  const byProduct = {}; // pid -> { p, shortages: [{variantName, shortage}] }
+
   skus.forEach(sku=>{
-    const sep=sku.indexOf('|');
-    const pid=sku.slice(0,sep), variantName=sku.slice(sep+1);
+    const sepIdx=sku.indexOf("||");
+    const pid=sku.slice(0,sepIdx), variantName=sku.slice(sepIdx+2);
     const p=products.find(x=>x.id===pid); if(!p||archivedProducts[pid])return;
 
     let totalNeeded=0;
@@ -2174,29 +2177,40 @@ function renderPurchase() {
     const shortage=Math.max(0,totalNeeded-ordered);
     if(!shortage)return;
 
-    const cat=p.cat||"其他";
-    if(!shortages[cat])shortages[cat]=[];
-    const displayName=(variantName&&p.variants&&p.variants.length)
-      ?`${p.name} — ${variantName}`
-      :p.name;
-    shortages[cat].push({pid,displayName,img:p.img||"",shortage});
+    if(!byProduct[pid]) byProduct[pid]={p, totalShortage:0, variants:[]};
+    byProduct[pid].variants.push({variantName, shortage});
+    byProduct[pid].totalShortage+=shortage;
   });
 
-  if(!Object.keys(shortages).length){
+  if(!Object.keys(byProduct).length){
     el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">目前沒有缺貨 🎉</div>';return;
   }
 
-  const catOrder=[...new Set(["樂天世界商品","楓之谷網咖","快閃店","其他",...Object.keys(shortages)])];
+  // 按類別分組
+  const byCat={};
+  Object.values(byProduct).forEach(({p,totalShortage,variants})=>{
+    const cat=p.cat||"其他";
+    if(!byCat[cat])byCat[cat]=[];
+    byCat[cat].push({p,totalShortage,variants});
+  });
+
+  const catOrder=[...new Set(["樂天世界商品","楓之谷網咖","快閃店","其他",...Object.keys(byCat)])];
   let html="";
-  catOrder.filter(c=>shortages[c]&&shortages[c].length).forEach(cat=>{
-    const rows=shortages[cat].map(i=>`
-      <div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
+  catOrder.filter(c=>byCat[c]&&byCat[c].length).forEach(cat=>{
+    const rows=byCat[cat].map(({p,totalShortage,variants})=>{
+      const hasMultiple=variants.length>1||(variants.length===1&&variants[0].variantName!=="");
+      const variantLines=hasMultiple
+        ? variants.map(v=>`<div style="font-size:12px;color:var(--text-secondary);margin-left:44px;padding:1px 0">└ ${v.variantName||"（未指定）"} ×${v.shortage}</div>`).join("")
+        : "";
+      return `<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
         <div style="display:flex;align-items:center;gap:8px">
-          ${i.img?`<img src="${i.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
-          <span style="flex:1;font-size:13px">${i.displayName}</span>
-          <span style="font-size:13px;font-weight:700;color:var(--red)">缺 ×${i.shortage}</span>
+          ${p.img?`<img src="${p.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
+          <span style="flex:1;font-size:13px">${p.name}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--red)">缺 ×${totalShortage}</span>
         </div>
-      </div>`).join('');
+        ${variantLines}
+      </div>`;
+    }).join("");
     html+=`<div class="sec-title">${CAT_EMOJI[cat]||""} ${cat}</div>
       <div class="card" style="border-left:3px solid ${CAT_COLOR[cat]||"var(--pink)"};">${rows}</div>`;
   });
@@ -2434,7 +2448,13 @@ function renderPayments() {
   const gr=grand-grandPaid;
   const profit=grand-grandTwd;
 
-  const z1rows=zone1.map(custRow).join('');
+  const z1active=zone1.filter(c=>!(shippingState[c.id]||{}).shipped);
+  const z1shipped=zone1.filter(c=>(shippingState[c.id]||{}).shipped);
+  const z1rows=z1active.map(custRow).join('')+
+    (z1shipped.length?`<div style="text-align:right;margin:4px 0">
+      <button class="btn btn-sm" style="font-size:11px;padding:2px 8px;color:var(--green);border-color:var(--green)" onclick="toggleEl('shipped-zone1')">已出貨 ${z1shipped.length} ▾</button>
+    </div>
+    <div id="shipped-zone1" style="display:none">${z1shipped.map(custRow).join('')}</div>`:'');
   const z2rows=zone2.map(custRow).join('');
   const z3rows=zone3.map(custRow).join('');
 
