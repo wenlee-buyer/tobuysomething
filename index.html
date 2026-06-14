@@ -2074,76 +2074,87 @@ function renderPurchase() {
   const el=document.getElementById("purchase-list");
   const all={};
 
-  // 從訂單計算需求
-  orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((item,idx)=>{
+  // 依訂單時間順序，計算每個商品/款式的缺口
+  // 先收集所有 pid+variantName 組合
+  const pidVariants = new Set();
+  orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach(item=>{
     const p=products.find(x=>x.id===item.pid);
-    const cat=p?p.cat:"其他";
-    if(!all[cat])all[cat]={};
-    const key=item.pid;
-    if(!all[cat][key])all[cat][key]={pid:item.pid,name:p?p.name:item.name,img:p?p.img:"",totalQty:0,variantNeeds:{},notes:[]};
-    const checked=!!itemChecked[`${o.cid}_${o.id}_${idx}`];
-    if(!checked){
-      all[cat][key].totalQty+=item.qty;
-      if(item.variants&&item.variants.length){
-        item.variants.forEach(v=>{
-          all[cat][key].variantNeeds[v.name]=(all[cat][key].variantNeeds[v.name]||0)+v.qty;
-        });
-      }
+    if(!p)return;
+    if(item.variants&&item.variants.length){
+      item.variants.forEach(v=>pidVariants.add(`${item.pid}|${v.name}`));
+    } else {
+      pidVariants.add(`${item.pid}|${item.note||""}`);
     }
   }));
 
-  // 從庫存計算缺貨（ordered不足）
-  products.filter(p=>!archivedProducts[p.id]).forEach(p=>{
-    const cat=p.cat||"其他";
+  // 計算每個組合的缺口
+  pidVariants.forEach(pv=>{
+    const [pid, variantName]=pv.split('|');
+    const p=products.find(x=>x.id===pid); if(!p)return;
+    if(archivedProducts[pid])return;
+
+    // 總訂單需求
+    let totalNeeded=0;
+    orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((item,idx)=>{
+      if(item.pid!==pid)return;
+      const checked=!!itemChecked[`${o.cid}_${o.id}_${idx}`];
+      if(checked)return;
+      if(item.variants&&item.variants.length){
+        const v=item.variants.find(x=>x.name===variantName);
+        if(v)totalNeeded+=v.qty;
+      } else {
+        if((item.note||"")===(variantName||""))totalNeeded+=item.qty;
+      }
+    }));
+    if(!totalNeeded)return;
+
+    // ordered 量：有款式的商品用 variantName 找對應款式的 ordered
+    let ordered=0;
     if(p.variants&&p.variants.length){
-      p.variants.forEach(v=>{
-        const shortage=Math.max(0,-(v.ordered||0));
-        if(!shortage)return;
-        if(!all[cat])all[cat]={};
-        if(!all[cat][p.id])all[cat][p.id]={pid:p.id,name:p.name,img:p.img||"",totalQty:0,variantNeeds:{},notes:[]};
-        all[cat][p.id].variantNeeds[v.name]=(all[cat][p.id].variantNeeds[v.name]||0)+shortage;
-        all[cat][p.id].totalQty+=shortage;
-      });
+      const v=p.variants.find(x=>x.name===variantName);
+      ordered=v?(v.ordered||0):0;
     } else {
-      const shortage=Math.max(0,-(p.ordered||0));
-      if(!shortage)return;
-      if(!all[cat])all[cat]={};
-      if(!all[cat][p.id])all[cat][p.id]={pid:p.id,name:p.name,img:p.img||"",totalQty:0,variantNeeds:{},notes:[]};
-      all[cat][p.id].totalQty+=shortage;
+      ordered=p.ordered||0;
     }
+
+    const shortage=Math.max(0, totalNeeded-ordered);
+    if(!shortage)return;
+
+    const cat=p.cat||"其他";
+    if(!all[cat])all[cat]={};
+    if(!all[cat][pid])all[cat][pid]={pid,name:p.name,img:p.img||"",totalQty:0,variantNeeds:{}};
+    // 只有商品有設款式，或 variantName 不為空時才縮排顯示款式
+    if((p.variants&&p.variants.length)||variantName){
+      all[cat][pid].variantNeeds[variantName||"（未指定款式）"]=(all[cat][pid].variantNeeds[variantName||"（未指定款式）"]||0)+shortage;
+    }
+    all[cat][pid].totalQty+=shortage;
   });
 
-  if(!Object.keys(all).length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">還沒有任何訂單</div>';return}
+  if(!Object.keys(all).length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">太棒了！目前沒有缺貨</div>';return}
   const catOrder=[...new Set(["樂天世界商品","楓之谷網咖","快閃店","其他",...Object.keys(all)])];
   let html="";
-  const catsWithPending=catOrder.filter(c=>all[c]&&Object.values(all[c]).some(i=>i.totalQty>0));
-  const catsDone=catOrder.filter(c=>all[c]&&Object.values(all[c]).every(i=>i.totalQty<=0));
-  [...catsWithPending,...catsDone].forEach(cat=>{
-    let catPending="", catDone="";
+  catOrder.filter(c=>all[c]).forEach(cat=>{
+    let rows="";
     Object.values(all[cat]).forEach(i=>{
-      const isDone=i.totalQty<=0;
-      const variantLines=Object.entries(i.variantNeeds).filter(([,qty])=>qty>0)
-        .map(([name,qty])=>`<div style="font-size:12px;color:var(--text-secondary);margin-left:44px;padding:1px 0">└ ${name} ×${qty}</div>`).join('');
-      const row=`<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
+      const hasVariants=Object.keys(i.variantNeeds).length>0;
+      const variantLines=hasVariants
+        ? Object.entries(i.variantNeeds).filter(([,qty])=>qty>0)
+            .map(([name,qty])=>`<div style="font-size:12px;color:var(--red);margin-left:44px;padding:1px 0">└ ${name} ×${qty}</div>`).join('')
+        : '';
+      rows+=`<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
         <div style="display:flex;align-items:center;gap:8px">
           ${i.img?`<img src="${i.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
-          <span style="flex:1;font-size:14px${isDone?';text-decoration:line-through;color:var(--text-tertiary)':''}">${i.name}</span>
-          <div style="text-align:right;flex-shrink:0">
-            ${isDone?`<span style="font-size:12px;color:var(--green)">✅ 全配完</span>`:`<span style="font-size:13px;font-weight:700;color:var(--red)">×${i.totalQty}</span>`}
-          </div>
+          <span style="flex:1;font-size:14px">${i.name}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--red)">缺 ×${i.totalQty}</span>
         </div>
         ${variantLines}
       </div>`;
-      if(isDone)catDone+=row; else catPending+=row;
     });
-    const doneCount=catDone?catDone.split("border-bottom").length-1:0;
+    if(!rows)return;
     html+=`<div class="sec-title">${CAT_EMOJI[cat]||""} ${cat}</div>
-      ${catPending
-        ?`<div class="card" style="border-left:3px solid ${CAT_COLOR[cat]||"var(--pink)"};">${catPending}</div>`
-        :`<div style="border-left:3px solid ${CAT_COLOR[cat]||"var(--pink)"};background:var(--card);border-radius:var(--radius);border:0.5px solid var(--border);padding:4px 10px;margin-bottom:8px;text-align:right;font-size:11px;color:var(--text-tertiary)">此分類全部完成 ✅</div>`}
-      ${catDone?`<div style="text-align:right;margin-top:2px"><button class="btn btn-sm" style="font-size:11px;padding:2px 8px;color:var(--green);border-color:var(--green)" onclick="togglePurchaseDone('${cat}')">已完成 ${doneCount} ▾</button></div><div id="purchase-done-${cat}" style="display:none"><div class="card" style="border-left:3px solid var(--green);opacity:0.7">${catDone}</div></div>`:""}`;
+      <div class="card" style="border-left:3px solid ${CAT_COLOR[cat]||"var(--pink)"};">${rows}</div>`;
   });
-  el.innerHTML=html||'<div style="text-align:center;padding:20px;color:var(--text-tertiary)">所有品項已採購完畢！</div>';
+  el.innerHTML=html||'<div style="text-align:center;padding:20px;color:var(--text-tertiary)">太棒了！目前沒有缺貨</div>';
 }
 window.togglePurchaseDone = function(cat) {
   const el=document.getElementById(`purchase-done-${cat}`);
