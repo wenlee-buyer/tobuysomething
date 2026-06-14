@@ -1838,8 +1838,8 @@ function renderOrderProds() {
         </div>
         ${isChecked?`<div style="margin-top:6px;margin-left:26px">
           ${p.salePrice?`<div style="display:flex;gap:6px;margin-bottom:6px">
-            <button class="btn btn-sm" style="font-size:11px;padding:2px 10px;${!orderItems[p.id]||orderItems[p.id].price===p.price?'background:var(--pink);color:#fff;border-color:var(--pink)':'color:var(--text-secondary)'}" onclick="setPriceMode('${p.id}','normal')">定 NT$${p.price}</button>
-            <button class="btn btn-sm" style="font-size:11px;padding:2px 10px;${orderItems[p.id]&&orderItems[p.id].price===p.salePrice?'background:var(--green);color:#fff;border-color:var(--green)':'color:var(--text-secondary)'}" onclick="setPriceMode('${p.id}','sale')">優 NT$${p.salePrice}</button>
+            <button class="btn btn-sm" style="font-size:11px;padding:2px 10px;${(()=>{const k=hasVariants?`${p.id}|${p.variants[0].name}`:p.id;return !orderItems[k]||orderItems[k].price===p.price})()?' background:var(--pink);color:#fff;border-color:var(--pink)':'color:var(--text-secondary)'}" onclick="setPriceMode('${p.id}','normal')">定 NT$${p.price}</button>
+            <button class="btn btn-sm" style="font-size:11px;padding:2px 10px;${(()=>{const k=hasVariants?`${p.id}|${p.variants[0].name}`:p.id;return orderItems[k]&&orderItems[k].price===p.salePrice})()?' background:var(--green);color:#fff;border-color:var(--green)':'color:var(--text-secondary)'}" onclick="setPriceMode('${p.id}','sale')">優 NT$${p.salePrice}</button>
           </div>`:''}
           ${hasVariants?p.variants.map(v=>{
             const key=`${p.id}|${v.name}`;
