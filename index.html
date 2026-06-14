@@ -1355,44 +1355,50 @@ function renderProducts() {
   const archivedList=products.filter(p=>archivedProducts[p.id]&&(activeCat==="all"||p.cat===activeCat)&&(!q||p.name.toLowerCase().includes(q)));
 
   function prodCard(p, isArchived) {
-    return `<div class="card" style="border-left:3px solid ${CAT_COLOR[p.cat]||"#D4537E"};padding:8px 10px${isArchived?';opacity:0.65':''}">
-      <div style="display:flex;align-items:center;gap:8px">
-        ${p.img?`<img src="${p.img}" class="thumb-lg" onclick="openLight('${p.id}')" style="cursor:pointer" alt="">`:`<div class="thumb-ph" onclick="editProduct('${p.id}')"><i class="ti ti-photo-plus" style="font-size:22px;color:var(--text-tertiary)"></i></div>`}
+    const remain=(p.ordered||0)-getTotalNeeded(p.id,'');
+    return `<div class="card" style="border-left:3px solid ${CAT_COLOR[p.cat]||"#D4537E"};padding:10px 12px${isArchived?';opacity:0.65':''}">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        ${p.img?`<img src="${p.img}" class="thumb-lg" onclick="openLight('${p.id}')" style="cursor:pointer;flex-shrink:0" alt="">`:`<div class="thumb-ph" onclick="editProduct('${p.id}')" style="flex-shrink:0"><i class="ti ti-photo-plus" style="font-size:22px;color:var(--text-tertiary)"></i></div>`}
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:14px;margin-bottom:3px">${p.name}</div>
-          <div style="font-size:12px;color:var(--text-secondary)">₩${p.krw.toLocaleString()} → NT$${p.twd}</div>
-          ${p.note?`<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">${p.note}</div>`:""}
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:2px">
+            <div style="font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>
+            <div style="flex-shrink:0;text-align:right">
+              <div class="price-badge">NT$${p.price}</div>
+              ${p.salePrice?`<div style="font-size:11px;color:var(--green)">優 NT$${p.salePrice}</div>`:""}
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px">₩${p.krw.toLocaleString()} → NT$${p.twd}${p.note?` · ${p.note}`:""}</div>
+          
           ${p.variants&&p.variants.length?
-            `<div style="margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px">
+            `<div style="background:var(--gray);border-radius:8px;padding:6px 8px;margin-bottom:6px">
+              <div style="display:grid;grid-template-columns:1fr 60px 60px 42px;gap:4px;margin-bottom:4px">
+                <div style="font-size:10px;color:var(--text-tertiary)">款式</div>
+                <div style="font-size:10px;color:var(--text-tertiary);text-align:center">現貨</div>
+                <div style="font-size:10px;color:var(--text-tertiary);text-align:center">+已買</div>
+                <div style="font-size:10px;color:var(--text-tertiary);text-align:center">配餘</div>
+              </div>
               ${p.variants.map((v,vi)=>{
-                const remain=(v.ordered||0)-getTotalNeeded(p.id, v.name);
-                return `<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;font-size:11px">
-                  <span style="flex:1;color:var(--text-secondary);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}</span>
-                  <label style="color:var(--text-tertiary);font-size:10px;flex-shrink:0">現</label>
-                  <input type="number" min="0" value="${v.stock||0}" inputmode="numeric" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center;flex-shrink:0" onchange="updateVariantStockField('${p.id}',${vi},'stock',this.value)">
-                  <label style="color:var(--text-tertiary);font-size:10px;flex-shrink:0">已買</label>
-                  <input type="number" min="0" value="" placeholder="+補" inputmode="numeric" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center;flex-shrink:0" onchange="updateVariantStockField('${p.id}',${vi},'ordered',this.value)">
-                  <span style="font-size:10px;color:var(--text-tertiary);flex-shrink:0">共${v.ordered||0}</span>
-                  <label style="color:var(--text-tertiary);font-size:10px;flex-shrink:0">配餘</label>
-                  <span style="font-size:11px;font-weight:700;min-width:20px;text-align:right;flex-shrink:0;color:${remain>0?'var(--green)':remain<0?'var(--red)':' var(--text-tertiary)'}">${remain}</span>
+                const vRemain=(v.ordered||0)-getTotalNeeded(p.id,v.name);
+                return `<div style="display:grid;grid-template-columns:1fr 60px 60px 42px;gap:4px;align-items:center;margin-bottom:3px">
+                  <div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}<span style="font-size:10px;color:var(--text-tertiary);margin-left:3px">共${v.ordered||0}</span></div>
+                  <input type="number" min="0" value="${v.stock||0}" inputmode="numeric" style="margin:0;padding:3px 4px;font-size:12px;text-align:center;width:100%" onchange="updateVariantStockField('${p.id}',${vi},'stock',this.value)">
+                  <input type="number" min="0" value="" placeholder="+補" inputmode="numeric" style="margin:0;padding:3px 4px;font-size:12px;text-align:center;width:100%;background:var(--pink-light)" onchange="updateVariantStockField('${p.id}',${vi},'ordered',this.value)">
+                  <div style="font-size:12px;font-weight:700;text-align:center;color:${vRemain>0?'var(--green)':vRemain<0?'var(--red)':'var(--text-tertiary)'}">${vRemain}</div>
                 </div>`;
               }).join('')}
             </div>`:
-            `<div style="display:flex;align-items:center;gap:3px;margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px;font-size:11px">
-              <label style="color:var(--text-tertiary);font-size:10px">現</label>
-              <input type="number" min="0" value="${p.stock||0}" inputmode="numeric" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','stock',this.value)">
-              <label style="color:var(--text-tertiary);font-size:10px">已買</label>
-              <input type="number" min="0" value="" placeholder="+補" inputmode="numeric" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','ordered',this.value)">
-              <span style="font-size:10px;color:var(--text-tertiary)">共${p.ordered||0}</span>
-              <label style="color:var(--text-tertiary);font-size:10px">配餘</label>
-              <span style="font-size:11px;font-weight:700;color:${(p.ordered||0)-getTotalNeeded(p.id,'')>0?'var(--green)':(p.ordered||0)-getTotalNeeded(p.id,'')<0?'var(--red)':'var(--text-tertiary)'}">${(p.ordered||0)-getTotalNeeded(p.id,'')}</span>
+            `<div style="display:flex;align-items:center;gap:6px;background:var(--gray);border-radius:8px;padding:6px 8px;margin-bottom:6px">
+              <span style="font-size:11px;color:var(--text-tertiary)">現</span>
+              <input type="number" min="0" value="${p.stock||0}" inputmode="numeric" style="width:52px;margin:0;padding:3px 6px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','stock',this.value)">
+              <span style="font-size:11px;color:var(--text-tertiary)">+已買</span>
+              <input type="number" min="0" value="" placeholder="補" inputmode="numeric" style="width:52px;margin:0;padding:3px 6px;font-size:12px;text-align:center;background:var(--pink-light)" onchange="updateProductStockField('${p.id}','ordered',this.value)">
+              <span style="font-size:11px;color:var(--text-tertiary)">共${p.ordered||0}</span>
+              <span style="font-size:11px;color:var(--text-tertiary)">配餘</span>
+              <span style="font-size:13px;font-weight:700;color:${remain>0?'var(--green)':remain<0?'var(--red)':'var(--text-tertiary)'}">${remain}</span>
             </div>`
           }
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <div class="price-badge">NT$${p.price}</div>
-          ${p.salePrice?`<div style="font-size:11px;color:var(--green);margin-top:2px">優惠 NT$${p.salePrice}</div>`:""}
-          <div style="display:flex;gap:4px;margin-top:6px;justify-content:flex-end">
+          
+          <div style="display:flex;gap:4px;justify-content:flex-end">
             <button class="btn btn-sm" onclick="editProduct('${p.id}')"><i class="ti ti-edit"></i></button>
             <button class="btn btn-sm" onclick="toggleArchiveProduct('${p.id}')" style="color:${isArchived?'var(--green)':'var(--text-tertiary)'};border-color:${isArchived?'var(--green)':'var(--border-strong)'}"><i class="ti ti-${isArchived?'arrow-up':'archive'}" style="font-size:14px"></i></button>
             <button class="btn btn-sm btn-danger" onclick="delProduct('${p.id}')"><i class="ti ti-trash"></i></button>
