@@ -1380,7 +1380,7 @@ function renderProducts() {
               ${p.variants.map((v,vi)=>{
                 const vRemain=(v.ordered||0)-getTotalNeeded(p.id,v.name);
                 return `<div style="display:grid;grid-template-columns:1fr 60px 60px 42px;gap:4px;align-items:center;margin-bottom:3px">
-                  <div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}<span style="font-size:10px;color:var(--text-tertiary);margin-left:3px">共${v.ordered||0}</span></div>
+                  <div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}<input type="number" value="${v.ordered||0}" inputmode="numeric" style="width:40px;margin:0 0 0 4px;padding:1px 3px;font-size:10px;text-align:center;color:var(--text-tertiary);border:0.5px dashed var(--border)" onchange="updateVariantStockField('${p.id}',${vi},'ordered_set',this.value)" title="點擊直接修改總量"></div>
                   <input type="number" min="0" value="${v.stock||0}" inputmode="numeric" style="margin:0;padding:3px 4px;font-size:12px;text-align:center;width:100%" onchange="updateVariantStockField('${p.id}',${vi},'stock',this.value)">
                   <input type="number" min="0" value="" placeholder="+補" inputmode="numeric" style="margin:0;padding:3px 4px;font-size:12px;text-align:center;width:100%;background:var(--pink-light)" onchange="updateVariantStockField('${p.id}',${vi},'ordered',this.value)">
                   <div style="font-size:12px;font-weight:700;text-align:center;color:${vRemain>0?'var(--green)':vRemain<0?'var(--red)':'var(--text-tertiary)'}">${vRemain}</div>
@@ -1392,7 +1392,8 @@ function renderProducts() {
               <input type="number" min="0" value="${p.stock||0}" inputmode="numeric" style="width:52px;margin:0;padding:3px 6px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','stock',this.value)">
               <span style="font-size:11px;color:var(--text-tertiary)">+已買</span>
               <input type="number" min="0" value="" placeholder="補" inputmode="numeric" style="width:52px;margin:0;padding:3px 6px;font-size:12px;text-align:center;background:var(--pink-light)" onchange="updateProductStockField('${p.id}','ordered',this.value)">
-              <span style="font-size:11px;color:var(--text-tertiary)">共${p.ordered||0}</span>
+              <span style="font-size:11px;color:var(--text-tertiary)">共</span>
+              <input type="number" value="${p.ordered||0}" inputmode="numeric" style="width:44px;margin:0;padding:1px 3px;font-size:11px;text-align:center;color:var(--text-tertiary);border:0.5px dashed var(--border)" onchange="updateProductStockField('${p.id}','ordered_set',this.value)" title="點擊直接修改總量">
               <span style="font-size:11px;color:var(--text-tertiary)">配餘</span>
               <span style="font-size:13px;font-weight:700;color:${remain>0?'var(--green)':remain<0?'var(--red)':'var(--text-tertiary)'}">${remain}</span>
             </div>`
@@ -2029,8 +2030,10 @@ window.updateVariantStockField = async function(pid, vi, field, val) {
   const p=products.find(x=>x.id===pid); if(!p||!p.variants||!p.variants[vi])return;
   const addQty=Math.max(0,parseInt(val)||0);
   if(field==='ordered') {
-    // 配：累加，不是覆蓋
     p.variants[vi].ordered=(p.variants[vi].ordered||0)+addQty;
+  } else if(field==='ordered_set') {
+    // 直接設定總量，覆蓋
+    p.variants[vi].ordered=addQty;
   } else {
     p.variants[vi][field]=addQty;
   }
@@ -2041,6 +2044,9 @@ window.updateProductStockField = async function(pid, field, val) {
   const addQty=Math.max(0,parseInt(val)||0);
   if(field==='ordered') {
     p.ordered=(p.ordered||0)+addQty;
+  } else if(field==='ordered_set') {
+    // 直接設定總量，覆蓋
+    p.ordered=addQty;
   } else {
     p[field]=addQty;
   }
