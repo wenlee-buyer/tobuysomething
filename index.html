@@ -1695,9 +1695,9 @@ function calcAllocation(pid, variantName) {
   let remaining;
   if(variantName && p.variants && p.variants.length) {
     const v = p.variants.find(x=>x.name===variantName);
-    remaining = v ? Math.max(0,(v.ordered||0)-(v.allocated||0)) : 0;
+    remaining = v ? (v.ordered||0) : 0;
   } else {
-    remaining = Math.max(0,(p.ordered||0)-(p.allocated||0));
+    remaining = p.ordered||0;
   }
 
   const result = new Map();
