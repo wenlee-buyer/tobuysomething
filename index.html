@@ -2006,9 +2006,14 @@ function renderOrderPreview() {
 // ── STOCK HELPER ──
 // adjustOrdered(pid, variantName, delta): adjust ordered count for variant or product
 // 計算某個 pid+variantName 的所有未打勾訂單總需求
+function isCustAllCheckedGlobal(cid) {
+  const cOrds=orders.filter(o=>o.cid===cid);
+  if(!cOrds.length)return false;
+  return cOrds.every(o=>o.items.every((_,idx)=>!!itemChecked[`${cid}_${o.id}_${idx}`]));
+}
 function getTotalNeeded(pid, variantName) {
   let total=0;
-  orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((item,idx)=>{
+  orders.filter(o=>!archivedCustomers[o.cid]&&!isCustAllCheckedGlobal(o.cid)).forEach(o=>o.items.forEach((item,idx)=>{
     if(item.pid!==pid)return;
     if(item.variants&&item.variants.length){
       const v=item.variants.find(x=>x.name===variantName);
@@ -2132,7 +2137,7 @@ function renderPurchase() {
   const shortages = {};
 
   const skus = new Set();
-  orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach(item=>{
+  orders.filter(o=>!archivedCustomers[o.cid]&&!isCustAllCheckedGlobal(o.cid)).forEach(o=>o.items.forEach(item=>{
     const p=products.find(x=>x.id===item.pid); if(!p)return;
     if(item.variants&&item.variants.length){
       item.variants.forEach(v=>skus.add(`${item.pid}|${v.name}`));
@@ -2147,7 +2152,7 @@ function renderPurchase() {
     const p=products.find(x=>x.id===pid); if(!p||archivedProducts[pid])return;
 
     let totalNeeded=0;
-    orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((item,idx)=>{
+    orders.filter(o=>!archivedCustomers[o.cid]&&!isCustAllCheckedGlobal(o.cid)).forEach(o=>o.items.forEach((item,idx)=>{
       if(item.pid!==pid)return;
       if(item.variants&&item.variants.length){
         const v=item.variants.find(x=>x.name===variantName);
