@@ -2006,15 +2006,20 @@ function renderOrderPreview() {
 // 計算某個 pid+variantName 的所有未打勾訂單總需求
 function getTotalNeeded(pid, variantName) {
   let total=0;
-  orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((item,idx)=>{
-    if(item.pid!==pid)return;
-    if(item.variants&&item.variants.length){
-      const v=item.variants.find(x=>x.name===variantName);
-      if(v)total+=v.qty;
-    } else {
-      if((item.note||"")===(variantName||""))total+=item.qty;
-    }
-  }));
+  orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>{
+    // 跳過已完成分配的客人（全部打勾）
+    const allChecked=o.items.every((_,idx)=>!!itemChecked[`${o.cid}_${o.id}_${idx}`]);
+    if(allChecked)return;
+    o.items.forEach((item,idx)=>{
+      if(item.pid!==pid)return;
+      if(item.variants&&item.variants.length){
+        const v=item.variants.find(x=>x.name===variantName);
+        if(v)total+=v.qty;
+      } else {
+        if((item.note||"")===(variantName||""))total+=item.qty;
+      }
+    });
+  });
   return total;
 }
 
@@ -2070,8 +2075,14 @@ function adjustStock(pid, variantName, delta) {
 window.toggleVariant = function(pid, variantName, checked) {
   const p=products.find(x=>x.id===pid); if(!p)return;
   const key=`${pid}|${variantName}`;
-  if(checked) orderItems[key]={pid,name:p.name,qty:1,price:p.price,originalPrice:p.price,note:variantName};
-  else delete orderItems[key];
+  if(checked) {
+    // 繼承目前已選的價格（看其他款式用的是定價還是優惠價）
+    const existingKey=p.variants.map(v=>`${pid}|${v.name}`).find(k=>orderItems[k]&&orderItems[k].qty>0);
+    const currentPrice=existingKey?orderItems[existingKey].price:p.price;
+    orderItems[key]={pid,name:p.name,qty:1,price:currentPrice,originalPrice:p.price,note:variantName};
+  } else {
+    delete orderItems[key];
+  }
   renderOrderProds(); renderOrderPreview();
 };
 
@@ -2139,15 +2150,19 @@ function renderPurchase() {
     const p=products.find(x=>x.id===pid); if(!p||archivedProducts[pid])return;
 
     let totalNeeded=0;
-    orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((item,idx)=>{
-      if(item.pid!==pid)return;
-      if(item.variants&&item.variants.length){
-        const v=item.variants.find(x=>x.name===variantName);
-        if(v)totalNeeded+=v.qty;
-      } else {
-        if((item.note||"")===(variantName||""))totalNeeded+=item.qty;
-      }
-    }));
+    orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>{
+      const allChecked=o.items.every((_,idx)=>!!itemChecked[`${o.cid}_${o.id}_${idx}`]);
+      if(allChecked)return;
+      o.items.forEach((item,idx)=>{
+        if(item.pid!==pid)return;
+        if(item.variants&&item.variants.length){
+          const v=item.variants.find(x=>x.name===variantName);
+          if(v)totalNeeded+=v.qty;
+        } else {
+          if((item.note||"")===(variantName||""))totalNeeded+=item.qty;
+        }
+      });
+    });
     if(!totalNeeded)return;
 
     let ordered=0;
