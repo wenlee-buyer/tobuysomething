@@ -250,8 +250,15 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
       <div><label>台幣換算</label><input type="text" id="p-twd" readonly style="margin-bottom:0"></div>
       <div><label>建議代購價</label><input type="text" id="p-suggest" readonly style="background:var(--pink-light);color:var(--pink-dark);margin-bottom:0"></div>
     </div>
-    <label>代購價 (NT$)</label><input type="number" id="p-price">
+    <label>代購價 — 定價 (NT$)</label><input type="number" id="p-price" placeholder="一般定價">
+    <label>代購價 — 優惠價 (NT$)<span style="font-size:11px;color:var(--text-tertiary);margin-left:6px">社群客人用，選填</span></label><input type="number" id="p-sale-price" placeholder="留空則同定價">
     <label>備註</label><input type="text" id="p-note" placeholder="如：不挑款220 挑款280">
+    <div style="border-top:0.5px solid var(--border);margin:12px 0 10px"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:600;color:var(--pink)">📦 款式庫存（選填）</div>
+      <button class="btn btn-sm" type="button" onclick="addVariantRow()" style="font-size:11px"><i class="ti ti-plus"></i> 新增款式</button>
+    </div>
+    <div id="p-variants-list"></div>
     <div id="p-open-order-section" style="display:none">
       <div style="border-top:0.5px solid var(--border);margin:12px 0 10px"></div>
       <div style="font-size:13px;font-weight:500;color:var(--pink);margin-bottom:10px">🛒 同時開單給新客人</div>
@@ -1340,9 +1347,14 @@ function renderProducts() {
           <div style="font-weight:700;font-size:14px;margin-bottom:3px">${p.name}</div>
           <div style="font-size:12px;color:var(--text-secondary)">₩${p.krw.toLocaleString()} → NT$${p.twd}</div>
           ${p.note?`<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">${p.note}</div>`:""}
+          ${p.variants&&p.variants.length?
+            `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${p.variants.map(v=>{const avail=(v.stock||0)-(v.allocated||0);return `<span style="font-size:11px;padding:1px 6px;border-radius:10px;background:${avail>0?'var(--green-light)':avail<0?'var(--red-light)':'var(--gray)'};color:${avail>0?'var(--green)':avail<0?'var(--red)':'var(--text-tertiary)'}">${v.name} 現${v.stock||0}/配${v.allocated||0}/可${avail}</span>`;}).join('')}</div>`:
+            ((p.stock||p.allocated)?`<div style="margin-top:4px"><span style="font-size:11px;padding:1px 6px;border-radius:10px;background:${getAvail(p.id,'')<0?'var(--red-light)':getAvail(p.id,'')>0?'var(--green-light)':'var(--gray)'};color:${getAvail(p.id,'')<0?'var(--red)':getAvail(p.id,'')>0?'var(--green)':'var(--text-tertiary)'}">現${p.stock||0}/配${p.allocated||0}/可${getAvail(p.id,'')}</span></div>`:"")
+          }
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div class="price-badge">NT$${p.price}</div>
+          ${p.salePrice?`<div style="font-size:11px;color:var(--green);margin-top:2px">優惠 NT$${p.salePrice}</div>`:""}
           <div style="display:flex;gap:4px;margin-top:6px;justify-content:flex-end">
             <button class="btn btn-sm" onclick="editProduct('${p.id}')"><i class="ti ti-edit"></i></button>
             <button class="btn btn-sm" onclick="toggleArchiveProduct('${p.id}')" style="color:${isArchived?'var(--green)':'var(--text-tertiary)'};border-color:${isArchived?'var(--green)':'var(--border-strong)'}"><i class="ti ti-${isArchived?'arrow-up':'archive'}" style="font-size:14px"></i></button>
@@ -1388,7 +1400,7 @@ window.openLight = function(pid) {
 window.openAddProduct = function() {
   document.getElementById("modal-product-title").textContent="新增商品";
   document.getElementById("edit-pid").value="";
-  ["p-name","p-krw","p-price","p-note","p-cust-code","p-order-qty","p-order-note"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+  ["p-name","p-krw","p-price","p-sale-price","p-note","p-cust-code","p-order-qty","p-order-note"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
   document.getElementById("p-order-qty").value="1";
   document.getElementById("p-twd").value=""; document.getElementById("p-suggest").value="";
   updateCatList(); document.getElementById("p-cat").value="樂天世界商品";
@@ -1398,6 +1410,7 @@ window.openAddProduct = function() {
   document.getElementById("p-file").value="";
   document.getElementById("p-open-order-toggle").checked=false;
   document.getElementById("p-open-order-section").style.display="none";
+  renderVariantRows([]);
   openModal("modal-product");
 };
 window.toggleOpenOrder = function(cb) {
@@ -1412,6 +1425,7 @@ window.editProduct = function(id) {
   document.getElementById("p-krw").value=p.krw;
   document.getElementById("p-twd").value="NT$"+p.twd;
   document.getElementById("p-price").value=p.price;
+  document.getElementById("p-sale-price").value=p.salePrice||"";
   document.getElementById("p-suggest").value="";
   document.getElementById("p-note").value=p.note||"";
   currentEditImg=p.img||"";
@@ -1419,6 +1433,7 @@ window.editProduct = function(id) {
   document.getElementById("p-file").value="";
   document.getElementById("p-open-order-toggle").checked=false;
   document.getElementById("p-open-order-section").style.display="none";
+  renderVariantRows(p.variants||[]);
   openModal("modal-product");
 };
 window.calcProd = function() {
@@ -1431,7 +1446,9 @@ window.calcProd = function() {
 window.saveProduct = async function() {
   const id=document.getElementById("edit-pid").value;
   const krw=parseFloat(document.getElementById("p-krw").value)||0;
-  const data={id:id||"p"+Date.now(),cat:document.getElementById("p-cat").value,name:document.getElementById("p-name").value.trim(),krw,twd:Math.round(krw*RATE),price:parseFloat(document.getElementById("p-price").value)||0,note:document.getElementById("p-note").value.trim(),img:currentEditImg||""};
+  const salePrice=parseFloat(document.getElementById("p-sale-price").value)||0;
+  const variants=getVariantRows();
+  const data={id:id||"p"+Date.now(),cat:document.getElementById("p-cat").value,name:document.getElementById("p-name").value.trim(),krw,twd:Math.round(krw*RATE),price:parseFloat(document.getElementById("p-price").value)||0,salePrice:salePrice||0,note:document.getElementById("p-note").value.trim(),img:currentEditImg||"",variants};
   if(!data.name)return;
   if(id){const i=products.findIndex(x=>x.id===id);if(i>=0)products[i]=data}else products.push(data);
   const openOrder=document.getElementById("p-open-order-toggle").checked;
@@ -1499,13 +1516,17 @@ function renderCustomers() {
             <div style="display:flex;align-items:center;gap:8px">
               <input type="checkbox" ${checked?'checked':''} onchange="toggleItemChecked('${c.id}','${o.id}',${idx},this.checked)" style="width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:var(--green)">
               ${p&&p.img?`<img src="${p.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
-              <span style="flex:1;font-size:13px${checked?';text-decoration:line-through;color:var(--text-tertiary)':''}">${displayName}</span>
+              <span style="flex:1;font-size:13px${checked?';text-decoration:line-through;color:var(--text-tertiary)':(getAvail(i.pid,i.note||"")<0?';color:var(--red);font-weight:600':'')}">${displayName}${getAvail(i.pid,i.note||"")<0?" ⚠️":""}</span>
               ${p?catTag(p.cat):""}
               <span style="color:var(--text-secondary);font-size:12px;margin:0 4px">x${i.qty}</span>
               <span style="font-weight:700;font-size:13px">${priceChanged?`<span style="text-decoration:line-through;color:var(--text-tertiary);font-size:11px">原NT$${(i.originalPrice*i.qty).toLocaleString()}</span> <span style="color:var(--amber)">現NT$${(catalogPrice*i.qty).toLocaleString()}</span><br>客人價 NT$${(i.price*i.qty).toLocaleString()}`:`NT$${(i.price*i.qty).toLocaleString()}`}</span>
               ${!isCompleted?`<button class="btn btn-sm btn-danger" style="padding:3px 7px;margin-left:4px" onclick="deleteOrderItem('${o.id}',${idx})"><i class="ti ti-x"></i></button>`:''}
             </div>
-            ${i.note?`<div style="font-size:11px;color:var(--pink-dark);background:var(--pink-light);padding:2px 7px;border-radius:4px;margin-top:2px;margin-left:44px">💬 ${i.note}</div>`:""}
+            ${i.note?`<div style="display:flex;align-items:center;gap:4px;margin-top:2px;margin-left:44px">
+              <div style="font-size:11px;color:var(--pink-dark);background:var(--pink-light);padding:2px 7px;border-radius:4px;flex:1">💬 ${i.note}</div>
+              ${!isCompleted?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px" onclick="editItemNote('${o.id}',${idx},'${i.note.replace(/'/g,"\\'")}')"><i class="ti ti-edit"></i></button>
+              ${!i.synced?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;color:var(--green);border-color:var(--green)" onclick="syncItemStock('${o.id}',${idx})" title="同步庫存">🔄</button>`:'<span style="font-size:10px;color:var(--green)">✓已同步</span>'}`:''}
+            </div>`:`${!isCompleted?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;margin-top:2px;margin-left:44px;color:var(--text-tertiary)" onclick="editItemNote('${o.id}',${idx},'')"><i class="ti ti-message-plus"></i> 加備註</button>`:''}`}
           </div>`;
         }).join("")).join("")}
         <div style="margin-top:5px;padding-top:5px;border-top:none">
@@ -1597,9 +1618,76 @@ window.deleteOrder = async function(oid) {
 };
 window.deleteOrderItem = async function(oid, idx) {
   const o=orders.find(x=>x.id===oid); if(!o)return;
+  const item=o.items[idx];
+  const cid=o.cid;
+  const key=`${cid}_${oid}_${idx}`;
+  // If item was checked (allocated), refund allocated
+  if(item&&itemChecked[key]) {
+    adjustAlloc(item.pid, item.note||"", -item.qty);
+    delete itemChecked[key];
+  }
   o.items.splice(idx,1);
   if(o.items.length===0) orders=orders.filter(x=>x.id!==oid);
-  await saveAll(); renderCustomers(); renderPurchase(); renderPayments();
+  await saveAll(); renderCustomers(); renderPurchase(); renderPayments(); renderProducts();
+};
+window.editItemNote = async function(oid, idx, currentNote) {
+  const o=orders.find(x=>x.id===oid); if(!o)return;
+  const item=o.items[idx]; if(!item)return;
+  const p=products.find(x=>x.id===item.pid);
+  // If product has variants, show select; otherwise prompt
+  if(p&&p.variants&&p.variants.length) {
+    openItemNoteModal(oid, idx, item.note||"", p.variants);
+  } else {
+    const newNote=prompt("修改備註：", currentNote);
+    if(newNote===null)return;
+    item.note=newNote.trim();
+    await saveAll(); renderCustomers();
+  }
+};
+window.syncItemStock = async function(oid, idx) {
+  const o=orders.find(x=>x.id===oid); if(!o)return;
+  const item=o.items[idx]; if(!item)return;
+  const p=products.find(x=>x.id===item.pid);
+  if(!p){alert("找不到商品，請確認商品庫");return}
+  // Check variant match if product has variants
+  if(p.variants&&p.variants.length&&item.note) {
+    const v=p.variants.find(x=>x.name===item.note);
+    if(!v){alert(`找不到款式「${item.note}」，請先在商品庫設定款式`);return}
+  }
+  adjustAlloc(item.pid, item.note||"", item.qty);
+  item.synced=true; // mark as synced so button disappears
+  const avail=getAvail(item.pid, item.note||"");
+  await saveAll(); renderCustomers(); renderProducts();
+  alert(`✅ 已同步！已配貨 +${item.qty}，現在可配貨 ${avail}`);
+};
+function openItemNoteModal(oid, idx, currentNote, variants) {
+  const existing=document.getElementById("modal-item-note");
+  if(existing)existing.remove();
+  const el=document.createElement("div");
+  el.id="modal-item-note";
+  el.className="modal-overlay";
+  el.style.cssText="display:flex";
+  el.innerHTML=`<div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">修改款式</div>
+    <select id="item-note-select" style="margin-bottom:12px">
+      <option value="">— 不指定 —</option>
+      ${variants.map(v=>{const avail=(v.stock||0)-(v.allocated||0);return `<option value="${v.name}" ${currentNote===v.name?'selected':''}>${v.name}（可配${avail}）</option>`;}).join('')}
+    </select>
+    <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:12px">改款式後，按備註旁的 🔄 才會同步扣庫存</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="document.getElementById('modal-item-note').remove()">取消</button>
+      <button class="btn btn-primary" style="flex:1" onclick="saveItemNote('${oid}',${idx})">儲存</button>
+    </div>
+  </div>`;
+  document.body.appendChild(el);
+}
+window.saveItemNote = async function(oid, idx) {
+  const o=orders.find(x=>x.id===oid); if(!o)return;
+  const item=o.items[idx]; if(!item)return;
+  item.note=document.getElementById("item-note-select").value;
+  document.getElementById("modal-item-note").remove();
+  await saveAll(); renderCustomers();
 };
 window.openAddOrder = function(cid) {
   document.getElementById("order-cid").value=cid;
@@ -1635,19 +1723,85 @@ function renderOrderProds() {
           <div style="text-align:right;flex-shrink:0">
             ${checked?`<input type="number" min="1" value="${it.qty}" data-pid="${p.id}" style="width:46px;margin:0;padding:3px 4px;font-size:12px;text-align:center" onchange="setOItemQty('${p.id}',this.value)">
             <input type="number" placeholder="改價" data-pid-price="${p.id}" value="${it.price!==p.price?it.price:''}" style="width:60px;margin:3px 0 0;padding:3px 4px;font-size:11px;text-align:center" onchange="setOItemPrice(this)">
-            `:`<span style="font-size:11px;color:var(--pink)">NT$${p.price}</span>`}
+            `:`<div>
+              <span style="font-size:11px;color:var(--pink);cursor:pointer" onclick="toggleOrderItem('${p.id}',true)">定 NT$${p.price}</span>
+              ${p.salePrice?`<br><span style="font-size:11px;color:var(--green);cursor:pointer" onclick="toggleOrderItemSale('${p.id}')">優 NT$${p.salePrice}</span>`:''}
+            </div>`}
           </div>
         </div>
-        ${checked?`<input type="text" placeholder="備註" data-pid-note="${p.id}" value="${it&&it.note?it.note:''}" style="margin:4px 0 0 26px;width:calc(100% - 26px);padding:4px 8px;font-size:12px;color:var(--text-secondary)" oninput="setOItemNote(this)">`:''}
+        ${checked?(p.variants&&p.variants.length?
+          `<select data-pid-note="${p.id}" style="margin:4px 0 0 26px;width:calc(100% - 26px);padding:4px 8px;font-size:12px;color:var(--text-secondary)" onchange="setOItemNote(this)">
+            <option value="">— 選款式 —</option>
+            ${p.variants.map(v=>{const avail=(v.stock||0)-(v.allocated||0);return `<option value="${v.name}" ${it&&it.note===v.name?'selected':''}>${v.name}（可配${avail}）</option>`;}).join('')}
+          </select>`:
+          `<input type="text" placeholder="備註" data-pid-note="${p.id}" value="${it&&it.note?it.note:''}" style="margin:4px 0 0 26px;width:calc(100% - 26px);padding:4px 8px;font-size:12px;color:var(--text-secondary)" oninput="setOItemNote(this)">`)
+        :''}
       </div>`;
     }).join('')}`).join('');
 }
 window.renderOrderProds = renderOrderProds;
+// ── VARIANTS ──
+function renderVariantRows(variants) {
+  const el=document.getElementById("p-variants-list"); if(!el)return;
+  if(!variants.length){el.innerHTML='<div style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px">無款式設定，備註欄為自由輸入</div>';return}
+  el.innerHTML=variants.map((v,i)=>{
+    const avail=(v.stock||0)-(v.allocated||0);
+    return `<div style="margin-bottom:8px;padding:6px 8px;background:var(--gray);border-radius:8px">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+        <input type="text" placeholder="款式名稱（如：Cinema款）" value="${v.name||''}" data-vi="${i}" data-vf="name" style="flex:1;margin:0;font-size:12px" oninput="updateVariantField(this)">
+        <button class="btn btn-sm btn-danger" style="padding:3px 7px;flex-shrink:0" onclick="removeVariantRow(${i})"><i class="ti ti-trash"></i></button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="flex:1">
+          <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:2px">現貨</div>
+          <input type="number" value="${v.stock??0}" min="0" data-vi="${i}" data-vf="stock" style="width:100%;margin:0;font-size:13px;text-align:center" oninput="updateVariantField(this)">
+        </div>
+        <div style="flex:1">
+          <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:2px">已配貨</div>
+          <input type="number" value="${v.allocated??0}" min="0" data-vi="${i}" data-vf="allocated" style="width:100%;margin:0;font-size:13px;text-align:center;background:var(--pink-light);color:var(--pink-dark)" oninput="updateVariantField(this)">
+        </div>
+        <div style="flex:1;text-align:center">
+          <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:2px">可配貨</div>
+          <div style="font-size:14px;font-weight:700;color:${avail>0?'var(--green)':avail<0?'var(--red)':'var(--text-tertiary)'}">${avail}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+let _editVariants=[];
+window.addVariantRow = function() {
+  _editVariants=getVariantRows(); _editVariants.push({name:"",stock:0}); renderVariantRows(_editVariants);
+};
+window.removeVariantRow = function(i) {
+  _editVariants=getVariantRows(); _editVariants.splice(i,1); renderVariantRows(_editVariants);
+};
+window.updateVariantField = function(inp) {
+  _editVariants=getVariantRows();
+};
+function getVariantRows() {
+  const rows=document.querySelectorAll("#p-variants-list [data-vi]");
+  const map={};
+  rows.forEach(inp=>{
+    const i=parseInt(inp.dataset.vi); const f=inp.dataset.vf;
+    if(!map[i])map[i]={};
+    map[i][f]=["stock","allocated"].includes(f)?parseInt(inp.value)||0:inp.value;
+  });
+  return Object.values(map).filter(v=>v.name);
+}
+
 window.toggleOrderItem = function(pid, checked) {
   const p=products.find(x=>x.id===pid); if(!p)return;
   if(checked) orderItems[pid]={pid,name:p.name,qty:1,price:p.price,originalPrice:p.price,note:""};
   else delete orderItems[pid];
   renderOrderProds(); renderOrderPreview();
+};
+window.toggleOrderItemSale = function(pid) {
+  const p=products.find(x=>x.id===pid); if(!p||!p.salePrice)return;
+  orderItems[pid]={pid,name:p.name,qty:1,price:p.salePrice,originalPrice:p.price,note:""};
+  renderOrderProds(); renderOrderPreview();
+};
+window.setOItemVariant = function(pid, variantName) {
+  if(orderItems[pid]) orderItems[pid].note=variantName;
 };
 window.setOItemQty = function(pid, val) {
   if(orderItems[pid]){orderItems[pid].qty=parseInt(val)||1; renderOrderPreview();}
@@ -1687,12 +1841,44 @@ function renderOrderPreview() {
     <div style="display:flex;justify-content:space-between;font-weight:700;color:var(--pink-dark)"><span>合計</span><span>NT$${total.toLocaleString()}</span></div>
   </div>`;
 }
+// ── STOCK HELPER ──
+// adjustAlloc(pid, variantName, delta): add delta to allocated for variant (or product if no variants)
+function adjustAlloc(pid, variantName, delta) {
+  const p=products.find(x=>x.id===pid); if(!p)return;
+  if(p.variants&&p.variants.length) {
+    if(!variantName)return; // no variant selected, skip
+    const v=p.variants.find(x=>x.name===variantName); if(!v)return;
+    v.allocated=Math.max(0,(v.allocated||0)+delta);
+  } else {
+    // no variants = single SKU, track on product directly
+    p.allocated=Math.max(0,(p.allocated||0)+delta);
+  }
+}
+function adjustStock(pid, variantName, delta) {
+  const p=products.find(x=>x.id===pid); if(!p)return;
+  if(p.variants&&p.variants.length) {
+    if(!variantName)return;
+    const v=p.variants.find(x=>x.name===variantName); if(!v)return;
+    v.stock=Math.max(0,(v.stock||0)+delta);
+  } else {
+    p.stock=Math.max(0,(p.stock||0)+delta);
+  }
+}
+function getAvail(pid, variantName) {
+  const p=products.find(x=>x.id===pid); if(!p)return 0;
+  if(p.variants&&p.variants.length) {
+    const v=p.variants.find(x=>x.name===variantName); if(!v)return 0;
+    return (v.stock||0)-(v.allocated||0);
+  }
+  return (p.stock||0)-(p.allocated||0);
+}
+
 window.saveOrder = async function() {
   const cid=document.getElementById("order-cid").value;
   const items=Object.values(orderItems);
   if(!items.length)return;
   orders.push({id:"o"+Date.now(),cid,items,note:""});
-  await saveAll(); closeModal("modal-order"); renderCustomers(); renderPurchase(); renderPayments();
+  await saveAll(); closeModal("modal-order"); renderCustomers(); renderPurchase(); renderPayments(); renderProducts();
 };
 
 // ── PURCHASE ──
@@ -1715,28 +1901,54 @@ function renderPurchase() {
     const cat=p?p.cat:"其他";
     if(!all[cat])all[cat]={};
     const key=i.pid+"|"+(p?p.name:i.name);
-    if(!all[cat][key])all[cat][key]={name:p?p.name:i.name,totalQty:0,img:p?p.img:"",notes:[]};
+    if(!all[cat][key])all[cat][key]={pid:i.pid,name:p?p.name:i.name,totalQty:0,img:p?p.img:"",notes:[]};
     const checked=!!itemChecked[`${o.cid}_${o.id}_${idx}`];
     if(!checked) all[cat][key].totalQty+=i.qty;
     if(i.note)all[cat][key].notes.push({note:i.note,cid:o.cid,oid:o.id,idx,checked});
   }));
+
+  // Add shortage items (available < 0) even if totalQty = 0
+  products.forEach(p=>{
+    if(archivedProducts[p.id])return;
+    if(p.variants&&p.variants.length) {
+      p.variants.forEach(v=>{
+        const avail=(v.stock||0)-(v.allocated||0);
+        if(avail>=0)return;
+        const cat=p.cat||"其他";
+        if(!all[cat])all[cat]={};
+        const key=p.id+"|"+p.name;
+        if(!all[cat][key])all[cat][key]={pid:p.id,name:p.name,totalQty:0,img:p.img||"",notes:[]};
+        all[cat][key].shortage=(all[cat][key].shortage||0)+Math.abs(avail);
+      });
+    } else {
+      const avail=(p.stock||0)-(p.allocated||0);
+      if(avail>=0)return;
+      const cat=p.cat||"其他";
+      if(!all[cat])all[cat]={};
+      const key=p.id+"|"+p.name;
+      if(!all[cat][key])all[cat][key]={pid:p.id,name:p.name,totalQty:0,img:p.img||"",notes:[]};
+      all[cat][key].shortage=(all[cat][key].shortage||0)+Math.abs(avail);
+    }
+  });
+
   if(!Object.keys(all).length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">還沒有任何訂單</div>';return}
   const catOrder=[...new Set(["樂天世界商品","楓之谷網咖","快閃店","其他",...Object.keys(all)])];
   let html="";
-  // Sort: cats with pending items first, fully done cats last
-  const catsWithPending=catOrder.filter(c=>all[c]&&Object.values(all[c]).some(i=>i.totalQty>0));
-  const catsDone=catOrder.filter(c=>all[c]&&Object.values(all[c]).every(i=>i.totalQty<=0));
+  const catsWithPending=catOrder.filter(c=>all[c]&&Object.values(all[c]).some(i=>i.totalQty>0||i.shortage>0));
+  const catsDone=catOrder.filter(c=>all[c]&&Object.values(all[c]).every(i=>i.totalQty<=0&&!i.shortage));
   [...catsWithPending,...catsDone].forEach(cat=>{
     let catPending="", catDone="";
     Object.entries(all[cat]).forEach(([key,i])=>{
-      const isDone=i.totalQty<=0;
+      const isDone=i.totalQty<=0&&!i.shortage;
       const row=`<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
         <div style="display:flex;align-items:center;gap:8px">
           ${i.img?`<img src="${i.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
           <span style="flex:1;font-size:14px${isDone?";text-decoration:line-through;color:var(--text-tertiary)":""}">${i.name}</span>
-          ${isDone
-            ?`<span style="font-size:12px;color:var(--green)">✅ 全配完</span>`
-            :`<span style="font-size:13px;font-weight:700;color:var(--red)">還需 ×${i.totalQty}</span>`}
+          <div style="text-align:right;flex-shrink:0">
+            ${i.totalQty>0?`<div style="font-size:13px;font-weight:700;color:var(--red)">待採 ×${i.totalQty}</div>`:""}
+            ${i.shortage>0?`<div style="font-size:12px;font-weight:700;color:var(--orange)">⚠️ 缺貨 ×${i.shortage}</div>`:""}
+            ${isDone?`<span style="font-size:12px;color:var(--green)">✅ 全配完</span>`:""}
+          </div>
         </div>
         ${i.notes.length?`<div style="margin-top:4px;margin-left:44px">
           ${i.notes.map(n=>{
@@ -1769,8 +1981,14 @@ window.togglePurchaseDone = function(cat) {
 
 window.toggleItemCheckedFromPurchase = async function(cid, oid, idx, checked) {
   const key=`${cid}_${oid}_${idx}`;
+  const o=orders.find(x=>x.id===oid);
+  if(o&&o.items[idx]) {
+    const item=o.items[idx];
+    adjustAlloc(item.pid, item.note||"", checked ? item.qty : -item.qty);
+  }
   itemChecked[key]=checked;
-  await saveAll(); renderCustomers(); renderPurchase();
+  if(!checked) delete itemChecked[key];
+  await saveAll(); renderCustomers(); renderPurchase(); renderProducts();
 };
 window.toggleNoteDone = async function(key, idx, checked) {
   if(!purchaseState[key])purchaseState[key]={bought:0,noteDone:{}};
@@ -1780,8 +1998,14 @@ window.toggleNoteDone = async function(key, idx, checked) {
 };
 window.toggleItemChecked = async function(cid, oid, idx, checked) {
   const key=`${cid}_${oid}_${idx}`;
+  const o=orders.find(x=>x.id===oid); 
+  if(o&&o.items[idx]) {
+    const item=o.items[idx];
+    adjustAlloc(item.pid, item.note||"", checked ? item.qty : -item.qty);
+  }
   itemChecked[key]=checked;
-  await saveAll(); renderCustomers();
+  if(!checked) delete itemChecked[key];
+  await saveAll(); renderCustomers(); renderProducts();
 };
 window.toggleCheck = function(el) {
   const b=el.querySelector(".check-box"); b.classList.toggle("checked");
@@ -1873,12 +2097,20 @@ function renderShipping() {
 window.toggleShipping = async function(cid, field, checked) {
   if(!shippingState[cid])shippingState[cid]={ordered:false,shipped:false};
   shippingState[cid][field]=checked;
-  if(field==='shipped'&&checked){
-    shippingState[cid].ordered=true;
-    shippingState[cid].shippedAt=new Date().toISOString();
+  if(field==='shipped') {
+    if(checked) {
+      shippingState[cid].ordered=true;
+      shippingState[cid].shippedAt=new Date().toISOString();
+    } else {
+      delete shippingState[cid].shippedAt;
+    }
+    // Adjust stock for all items in this customer's orders
+    const cOrds=orders.filter(o=>o.cid===cid);
+    cOrds.forEach(o=>o.items.forEach(item=>{
+      adjustStock(item.pid, item.note||"", checked ? item.qty : -item.qty);
+    }));
   }
-  if(field==='shipped'&&!checked) delete shippingState[cid].shippedAt;
-  await saveAll(); renderPayments();
+  await saveAll(); renderPayments(); renderProducts();
 };
 window.toggleShipDetail = function(cid) {
   const detail=document.getElementById('ship-detail-'+cid);
