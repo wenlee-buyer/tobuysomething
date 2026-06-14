@@ -42,6 +42,8 @@
   }
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield}
 body{font-family:'Noto Sans TC',sans-serif;font-size:14px;color:var(--text);background:var(--bg);min-height:100vh}
 .app{max-width:480px;margin:0 auto;padding-bottom:80px;min-height:100vh;background:var(--bg)}
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;display:flex;background:var(--card);border-top:0.5px solid var(--border);z-index:100;padding-bottom:env(safe-area-inset-bottom)}
@@ -1367,9 +1369,9 @@ function renderProducts() {
                 return `<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;font-size:11px">
                   <span style="flex:1;color:var(--text-secondary);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}</span>
                   <label style="color:var(--text-tertiary);font-size:10px;flex-shrink:0">現</label>
-                  <input type="number" min="0" value="${v.stock||0}" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center;flex-shrink:0" onchange="updateVariantStockField('${p.id}',${vi},'stock',this.value)">
+                  <input type="number" min="0" value="${v.stock||0}" inputmode="numeric" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center;flex-shrink:0" onchange="updateVariantStockField('${p.id}',${vi},'stock',this.value)">
                   <label style="color:var(--text-tertiary);font-size:10px;flex-shrink:0">已買</label>
-                  <input type="number" min="0" value="" placeholder="+補" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center;flex-shrink:0" onchange="updateVariantStockField('${p.id}',${vi},'ordered',this.value)">
+                  <input type="number" min="0" value="" placeholder="+補" inputmode="numeric" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center;flex-shrink:0" onchange="updateVariantStockField('${p.id}',${vi},'ordered',this.value)">
                   <span style="font-size:10px;color:var(--text-tertiary);flex-shrink:0">共${v.ordered||0}</span>
                   <label style="color:var(--text-tertiary);font-size:10px;flex-shrink:0">配餘</label>
                   <span style="font-size:11px;font-weight:700;min-width:20px;text-align:right;flex-shrink:0;color:${remain>0?'var(--green)':remain<0?'var(--red)':' var(--text-tertiary)'}">${remain}</span>
@@ -1378,9 +1380,9 @@ function renderProducts() {
             </div>`:
             `<div style="display:flex;align-items:center;gap:3px;margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px;font-size:11px">
               <label style="color:var(--text-tertiary);font-size:10px">現</label>
-              <input type="number" min="0" value="${p.stock||0}" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','stock',this.value)">
+              <input type="number" min="0" value="${p.stock||0}" inputmode="numeric" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','stock',this.value)">
               <label style="color:var(--text-tertiary);font-size:10px">已買</label>
-              <input type="number" min="0" value="" placeholder="+補" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','ordered',this.value)">
+              <input type="number" min="0" value="" placeholder="+補" inputmode="numeric" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','ordered',this.value)">
               <span style="font-size:10px;color:var(--text-tertiary)">共${p.ordered||0}</span>
               <label style="color:var(--text-tertiary);font-size:10px">配餘</label>
               <span style="font-size:11px;font-weight:700;color:${(p.ordered||0)-(p.allocated||0)>0?'var(--green)':(p.ordered||0)-(p.allocated||0)<0?'var(--red)':' var(--text-tertiary)'}">${(p.ordered||0)-(p.allocated||0)}</span>
@@ -1869,11 +1871,11 @@ function renderVariantRows(variants) {
       <div style="display:flex;gap:12px;align-items:center">
         <div>
           <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:2px">現貨</div>
-          <input type="number" value="${v.stock??0}" min="0" data-vi="${i}" data-vf="stock" style="width:72px;margin:0;font-size:13px;text-align:center;padding:6px 4px" oninput="updateVariantField(this)">
+          <input type="number" value="${v.stock??0}" min="0" data-vi="${i}" data-vf="stock" inputmode="numeric" style="width:72px;margin:0;font-size:13px;text-align:center;padding:6px 4px" oninput="updateVariantField(this)">
         </div>
         <div>
           <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:2px">已買（累加）</div>
-          <input type="number" value="${v.ordered??0}" min="0" data-vi="${i}" data-vf="ordered" style="width:72px;margin:0;font-size:13px;text-align:center;padding:6px 4px;background:var(--pink-light);color:var(--pink-dark)" oninput="updateVariantField(this)">
+          <input type="number" value="${v.ordered??0}" min="0" data-vi="${i}" data-vf="ordered" inputmode="numeric" style="width:72px;margin:0;font-size:13px;text-align:center;padding:6px 4px;background:var(--pink-light);color:var(--pink-dark)" oninput="updateVariantField(this)">
         </div>
       </div>
     </div>`;
@@ -2592,13 +2594,14 @@ window.importNewProducts = async function() {
   alert(`成功匯入 ${toAdd.length} 項商品！`);
 };
 window.resetAllStock = async function() {
-  if(!confirm("確定要把所有商品的已買和配餘歸零嗎？"))return;
+  if(!confirm("確定要把所有商品的已買和配餘歸零嗎？同步記錄也會一起清除，需重新同步。"))return;
   products.forEach(p=>{
     p.ordered=0; p.allocated=0;
     if(p.variants)p.variants.forEach(v=>{v.ordered=0;v.allocated=0;});
   });
-  await saveAll(); renderProducts();
-  alert("已清零！請重新輸入已買數量。");
+  syncedItems={};
+  await saveAll(); renderProducts(); renderCustomers();
+  alert("已清零！請重新輸入已買數量，並重新同步舊訂單。");
 };
 
 window.recompressAll = async function() {
