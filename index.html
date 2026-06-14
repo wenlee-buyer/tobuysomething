@@ -1348,8 +1348,30 @@ function renderProducts() {
           <div style="font-size:12px;color:var(--text-secondary)">₩${p.krw.toLocaleString()} → NT$${p.twd}</div>
           ${p.note?`<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">${p.note}</div>`:""}
           ${p.variants&&p.variants.length?
-            `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${p.variants.map(v=>{const avail=(v.stock||0)-(v.allocated||0);return `<span style="font-size:11px;padding:1px 6px;border-radius:10px;background:${avail>0?'var(--green-light)':avail<0?'var(--red-light)':'var(--gray)'};color:${avail>0?'var(--green)':avail<0?'var(--red)':'var(--text-tertiary)'}">${v.name} 現${v.stock||0}/配${v.allocated||0}/可${avail}</span>`;}).join('')}</div>`:
-            ((p.stock||p.allocated)?`<div style="margin-top:4px"><span style="font-size:11px;padding:1px 6px;border-radius:10px;background:${getAvail(p.id,'')<0?'var(--red-light)':getAvail(p.id,'')>0?'var(--green-light)':'var(--gray)'};color:${getAvail(p.id,'')<0?'var(--red)':getAvail(p.id,'')>0?'var(--green)':'var(--text-tertiary)'}">現${p.stock||0}/配${p.allocated||0}/可${getAvail(p.id,'')}</span></div>`:"")
+            `<div style="margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px">
+              ${p.variants.map((v,vi)=>{
+                const avail=(v.stock||0)-(v.allocated||0);
+                return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12px">
+                  <span style="flex:1;color:var(--text-secondary)">${v.name}</span>
+                  <label style="color:var(--text-tertiary);font-size:11px">現</label>
+                  <input type="number" min="0" value="${v.stock||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateVariantStockField('${p.id}',${vi},'stock',this.value)">
+                  <label style="color:var(--text-tertiary);font-size:11px">配</label>
+                  <input type="number" min="0" value="${v.allocated||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateVariantStockField('${p.id}',${vi},'allocated',this.value)">
+                  <span style="font-size:11px;font-weight:700;min-width:28px;text-align:right;color:${avail<0?'var(--red)':avail>0?'var(--green)':'var(--text-tertiary)'}">可${avail}</span>
+                </div>`;
+              }).join('')}
+            </div>`:
+            ((p.stock!==undefined||p.allocated!==undefined)?
+              `<div style="display:flex;align-items:center;gap:6px;margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px;font-size:12px">
+                <label style="color:var(--text-tertiary);font-size:11px">現</label>
+                <input type="number" min="0" value="${p.stock||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','stock',this.value)">
+                <label style="color:var(--text-tertiary);font-size:11px">配</label>
+                <input type="number" min="0" value="${p.allocated||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','allocated',this.value)">
+                <span style="font-size:11px;font-weight:700;min-width:28px;color:${getAvail(p.id,'')<0?'var(--red)':getAvail(p.id,'')>0?'var(--green)':'var(--text-tertiary)'}">可${getAvail(p.id,'')}</span>
+              </div>`:
+              `<div style="margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px">
+                <button class="btn btn-sm" style="font-size:11px;color:var(--text-tertiary)" onclick="initProductStock('${p.id}')"><i class="ti ti-package"></i> 設定庫存</button>
+              </div>`)
           }
         </div>
         <div style="text-align:right;flex-shrink:0">
@@ -1621,11 +1643,9 @@ window.deleteOrderItem = async function(oid, idx) {
   const item=o.items[idx];
   const cid=o.cid;
   const key=`${cid}_${oid}_${idx}`;
-  // If item was checked (allocated), refund allocated
-  if(item&&itemChecked[key]) {
-    adjustAlloc(item.pid, item.note||"", -item.qty);
-    delete itemChecked[key];
-  }
+  // 刪除品項一律退還已配貨
+  if(item) adjustAlloc(item.pid, item.note||"", -item.qty);
+  delete itemChecked[key];
   o.items.splice(idx,1);
   if(o.items.length===0) orders=orders.filter(x=>x.id!==oid);
   await saveAll(); renderCustomers(); renderPurchase(); renderPayments(); renderProducts();
@@ -1843,6 +1863,22 @@ function renderOrderPreview() {
 }
 // ── STOCK HELPER ──
 // adjustAlloc(pid, variantName, delta): add delta to allocated for variant (or product if no variants)
+window.updateVariantStockField = async function(pid, vi, field, val) {
+  const p=products.find(x=>x.id===pid); if(!p||!p.variants||!p.variants[vi])return;
+  p.variants[vi][field]=Math.max(0,parseInt(val)||0);
+  await saveAll(); renderProducts();
+};
+window.updateProductStockField = async function(pid, field, val) {
+  const p=products.find(x=>x.id===pid); if(!p)return;
+  p[field]=Math.max(0,parseInt(val)||0);
+  await saveAll(); renderProducts();
+};
+window.initProductStock = async function(pid) {
+  const p=products.find(x=>x.id===pid); if(!p)return;
+  p.stock=0; p.allocated=0;
+  await saveAll(); renderProducts();
+};
+
 function adjustAlloc(pid, variantName, delta) {
   const p=products.find(x=>x.id===pid); if(!p)return;
   if(p.variants&&p.variants.length) {
@@ -1877,6 +1913,8 @@ window.saveOrder = async function() {
   const cid=document.getElementById("order-cid").value;
   const items=Object.values(orderItems);
   if(!items.length)return;
+  // 加單確認時扣已配貨
+  items.forEach(item=>adjustAlloc(item.pid, item.note||"", item.qty));
   orders.push({id:"o"+Date.now(),cid,items,note:""});
   await saveAll(); closeModal("modal-order"); renderCustomers(); renderPurchase(); renderPayments(); renderProducts();
 };
@@ -1981,14 +2019,8 @@ window.togglePurchaseDone = function(cat) {
 
 window.toggleItemCheckedFromPurchase = async function(cid, oid, idx, checked) {
   const key=`${cid}_${oid}_${idx}`;
-  const o=orders.find(x=>x.id===oid);
-  if(o&&o.items[idx]) {
-    const item=o.items[idx];
-    adjustAlloc(item.pid, item.note||"", checked ? item.qty : -item.qty);
-  }
-  itemChecked[key]=checked;
-  if(!checked) delete itemChecked[key];
-  await saveAll(); renderCustomers(); renderPurchase(); renderProducts();
+  if(checked) itemChecked[key]=true; else delete itemChecked[key];
+  await saveAll(); renderCustomers(); renderPurchase();
 };
 window.toggleNoteDone = async function(key, idx, checked) {
   if(!purchaseState[key])purchaseState[key]={bought:0,noteDone:{}};
@@ -1998,14 +2030,8 @@ window.toggleNoteDone = async function(key, idx, checked) {
 };
 window.toggleItemChecked = async function(cid, oid, idx, checked) {
   const key=`${cid}_${oid}_${idx}`;
-  const o=orders.find(x=>x.id===oid); 
-  if(o&&o.items[idx]) {
-    const item=o.items[idx];
-    adjustAlloc(item.pid, item.note||"", checked ? item.qty : -item.qty);
-  }
-  itemChecked[key]=checked;
-  if(!checked) delete itemChecked[key];
-  await saveAll(); renderCustomers(); renderProducts();
+  if(checked) itemChecked[key]=true; else delete itemChecked[key];
+  await saveAll(); renderCustomers();
 };
 window.toggleCheck = function(el) {
   const b=el.querySelector(".check-box"); b.classList.toggle("checked");
