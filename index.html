@@ -1365,7 +1365,7 @@ function renderProducts() {
           ${p.variants&&p.variants.length?
             `<div style="margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px">
               ${p.variants.map((v,vi)=>{
-                const remain=(v.ordered||0)-(v.allocated||0);
+                const remain=(v.ordered||0)-getTotalNeeded(p.id, v.name);
                 return `<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;font-size:11px">
                   <span style="flex:1;color:var(--text-secondary);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}</span>
                   <label style="color:var(--text-tertiary);font-size:10px;flex-shrink:0">現</label>
@@ -1385,7 +1385,7 @@ function renderProducts() {
               <input type="number" min="0" value="" placeholder="+補" inputmode="numeric" style="width:48px;margin:0;padding:3px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','ordered',this.value)">
               <span style="font-size:10px;color:var(--text-tertiary)">共${p.ordered||0}</span>
               <label style="color:var(--text-tertiary);font-size:10px">配餘</label>
-              <span style="font-size:11px;font-weight:700;color:${(p.ordered||0)-(p.allocated||0)>0?'var(--green)':(p.ordered||0)-(p.allocated||0)<0?'var(--red)':' var(--text-tertiary)'}">${(p.ordered||0)-(p.allocated||0)}</span>
+              <span style="font-size:11px;font-weight:700;color:${(p.ordered||0)-getTotalNeeded(p.id,'')>0?'var(--green)':(p.ordered||0)-getTotalNeeded(p.id,'')<0?'var(--red)':'var(--text-tertiary)'}">${(p.ordered||0)-getTotalNeeded(p.id,'')}</span>
             </div>`
           }
         </div>
@@ -1983,6 +1983,21 @@ function renderOrderPreview() {
 }
 // ── STOCK HELPER ──
 // adjustOrdered(pid, variantName, delta): adjust ordered count for variant or product
+// 計算某個 pid+variantName 的所有未打勾訂單總需求
+function getTotalNeeded(pid, variantName) {
+  let total=0;
+  orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((item,idx)=>{
+    if(item.pid!==pid)return;
+    if(item.variants&&item.variants.length){
+      const v=item.variants.find(x=>x.name===variantName);
+      if(v)total+=v.qty;
+    } else {
+      if((item.note||"")===(variantName||""))total+=item.qty;
+    }
+  }));
+  return total;
+}
+
 window.updateVariantStockField = async function(pid, vi, field, val) {
   const p=products.find(x=>x.id===pid); if(!p||!p.variants||!p.variants[vi])return;
   const addQty=Math.max(0,parseInt(val)||0);
@@ -2106,8 +2121,6 @@ function renderPurchase() {
     let totalNeeded=0;
     orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((item,idx)=>{
       if(item.pid!==pid)return;
-      const checked=!!itemChecked[`${o.cid}_${o.id}_${idx}`];
-      if(checked)return;
       if(item.variants&&item.variants.length){
         const v=item.variants.find(x=>x.name===variantName);
         if(v)totalNeeded+=v.qty;
