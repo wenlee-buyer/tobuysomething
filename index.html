@@ -2150,6 +2150,10 @@ function renderPurchase() {
       item.variants.forEach(v=>{
         byProduct[item.pid].variantNeeds[v.name]=(byProduct[item.pid].variantNeeds[v.name]||0)+v.qty;
       });
+    } else if(p.variants&&p.variants.length){
+      // 舊格式但商品有設款式：note 作為款式名稱
+      const note=item.note||"";
+      byProduct[item.pid].variantNeeds[note]=(byProduct[item.pid].variantNeeds[note]||0)+item.qty;
     } else {
       // 舊格式/無款式：記錄備註和數量
       byProduct[item.pid].noVariantNeeds.push({note:item.note||"",qty:item.qty});
@@ -2164,7 +2168,7 @@ function renderPurchase() {
     let totalShortage=0;
 
     if(p.variants&&p.variants.length){
-      // 有款式：每款各自計算
+      // 有款式：每款各自計算（包含舊格式用note記的款式）
       Object.entries(variantNeeds).forEach(([vName, needed])=>{
         const v=p.variants.find(x=>x.name===vName);
         const ordered=v?(v.ordered||0):0;
