@@ -1187,6 +1187,7 @@ async function initDB() {
         payments = d.payments || [];
         purchaseState = d.purchaseState || {};
         itemChecked = d.itemChecked || {};
+        syncedItems = d.syncedItems || {};
         shippingState = d.shippingState || {};
         archivedProducts = d.archivedProducts || {};
         archivedShipping = d.archivedShipping || {};
@@ -1219,7 +1220,7 @@ async function initDB() {
 
 async function saveAll() {
   try {
-    await setDoc(doc(db, "proxy", "data"), {products, customers, orders, payments, purchaseState, itemChecked, shippingState, archivedProducts, archivedShipping, archivedOrders, archivedCustomers, ledgerEntries});
+    await setDoc(doc(db, "proxy", "data"), {products, customers, orders, payments, purchaseState, itemChecked, syncedItems, shippingState, archivedProducts, archivedShipping, archivedOrders, archivedCustomers, ledgerEntries});
     showSyncStatus("", "ok");
   } catch(e) {
     showSyncStatus("儲存失敗：" + e.message, "error");
@@ -1540,11 +1541,11 @@ function renderCustomers() {
             ${i.note?`<div style="display:flex;align-items:center;gap:4px;margin-top:2px;margin-left:44px">
               <div style="font-size:11px;color:var(--pink-dark);background:var(--pink-light);padding:2px 7px;border-radius:4px;flex:1">💬 ${i.note}</div>
               ${!isCompleted?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px" onclick="editItemNote('${o.id}',${idx},'${i.note.replace(/'/g,"\\'")}')"><i class="ti ti-edit"></i></button>
-              ${!i.synced?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;color:var(--green);border-color:var(--green)" onclick="syncItemStock('${o.id}',${idx})" title="同步庫存">🔄</button>`:'<span style="font-size:10px;color:var(--green)">✓已同步</span>'}`:''}
+              ${!syncedItems[`${o.id}_${idx}`]?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;color:var(--green);border-color:var(--green)" onclick="syncItemStock('${o.id}',${idx})" title="同步庫存">🔄</button>`:'<span style="font-size:10px;color:var(--green)">✓已同步</span>'}`:''}
             </div>`:
             `<div style="display:flex;align-items:center;gap:4px;margin-top:2px;margin-left:44px">
               ${!isCompleted?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;color:var(--text-tertiary)" onclick="editItemNote('${o.id}',${idx},'')"><i class="ti ti-message-plus"></i> 加備註</button>
-              ${!i.synced?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;color:var(--green);border-color:var(--green)" onclick="syncItemStock('${o.id}',${idx})" title="同步庫存">🔄</button>`:'<span style="font-size:10px;color:var(--green)">✓已同步</span>'}`:''}
+              ${!syncedItems[`${o.id}_${idx}`]?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;color:var(--green);border-color:var(--green)" onclick="syncItemStock('${o.id}',${idx})" title="同步庫存">🔄</button>`:'<span style="font-size:10px;color:var(--green)">✓已同步</span>'}`:''}
             </div>`}
           </div>`;
         }).join("")).join("")}
@@ -1671,7 +1672,7 @@ window.syncItemStock = async function(oid, idx) {
     if(!v){alert(`找不到款式「${item.note}」，請先在商品庫設定款式`);return}
   }
   adjustOrdered(item.pid, item.note||"", -item.qty);
-  item.synced=true;
+  syncedItems[`${oid}_${idx}`]=true;
   await saveAll();
   renderCustomers(); renderProducts();
 };
@@ -1908,6 +1909,16 @@ window.initProductStock = async function(pid) {
   await saveAll(); renderProducts();
 };
 
+function adjustOrdered(pid, variantName, delta) {
+  const p=products.find(x=>x.id===pid); if(!p)return;
+  if(p.variants&&p.variants.length) {
+    if(!variantName)return;
+    const v=p.variants.find(x=>x.name===variantName); if(!v)return;
+    v.ordered=Math.max(0,(v.ordered||0)+delta);
+  } else {
+    p.ordered=Math.max(0,(p.ordered||0)+delta);
+  }
+}
 function adjustStock(pid, variantName, delta) {
   const p=products.find(x=>x.id===pid); if(!p)return;
   if(p.variants&&p.variants.length) {
@@ -1933,6 +1944,7 @@ window.saveOrder = async function() {
 // purchase state stored in memory (not synced, local session only)
 let purchaseState = {};
 let itemChecked = {};
+let syncedItems = {}; // oid_idx -> true
 let shippingState = {};
 let archivedProducts = {};
 let collapsedCompleted = true;
