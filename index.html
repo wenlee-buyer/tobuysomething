@@ -174,7 +174,10 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <button class="btn btn-primary btn-block" onclick="forceSync()"><i class="ti ti-refresh"></i> 強制重新同步</button>
   </div>
   <div class="card" style="margin-top:8px">
-    <div style="font-weight:500;margin-bottom:6px">遷移圖片到 Cloudinary</div>
+    <div style="font-weight:500;margin-bottom:6px">重置庫存數字</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">把所有商品的「已買」和「配餘」歸零，讓你重新輸入正確數字</div>
+    <button class="btn btn-danger btn-block" onclick="resetAllStock()"><i class="ti ti-refresh"></i> 一鍵清零庫存</button>
+  </div>
     <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">把舊的 base64 圖片上傳到 Cloudinary，解決 Firebase 1MB 超限問題</div>
     <button class="btn btn-primary btn-block" onclick="recompressAll()"><i class="ti ti-cloud-upload"></i> 立即遷移</button>
   </div>
@@ -1192,7 +1195,7 @@ async function initDB() {
         payments = d.payments || [];
         purchaseState = d.purchaseState || {};
         itemChecked = d.itemChecked || {};
-        syncedItems = d.syncedItems || {};
+        syncedItems = {};
         shippingState = d.shippingState || {};
         archivedProducts = d.archivedProducts || {};
         archivedCats = d.archivedCats || {};
@@ -1358,20 +1361,27 @@ function renderProducts() {
           ${p.variants&&p.variants.length?
             `<div style="margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px">
               ${p.variants.map((v,vi)=>{
-                return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12px">
-                  <span style="flex:1;color:var(--text-secondary)">${v.name}</span>
-                  <label style="color:var(--text-tertiary);font-size:11px">現</label>
-                  <input type="number" min="0" value="${v.stock||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateVariantStockField('${p.id}',${vi},'stock',this.value)">
-                  <label style="color:var(--text-tertiary);font-size:11px">配</label>
-                  <input type="number" min="0" value="${v.ordered||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateVariantStockField('${p.id}',${vi},'ordered',this.value)">
+                const remain=(v.ordered||0)-(v.allocated||0);
+                return `<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;font-size:11px">
+                  <span style="flex:1;color:var(--text-secondary);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}</span>
+                  <label style="color:var(--text-tertiary);font-size:10px;flex-shrink:0">現</label>
+                  <input type="number" min="0" value="${v.stock||0}" style="width:34px;margin:0;padding:1px 2px;font-size:11px;text-align:center;flex-shrink:0" onchange="updateVariantStockField('${p.id}',${vi},'stock',this.value)">
+                  <label style="color:var(--text-tertiary);font-size:10px;flex-shrink:0">已買</label>
+                  <input type="number" min="0" value="" placeholder="+補" style="width:34px;margin:0;padding:1px 2px;font-size:11px;text-align:center;flex-shrink:0" onchange="updateVariantStockField('${p.id}',${vi},'ordered',this.value)">
+                  <span style="font-size:10px;color:var(--text-tertiary);flex-shrink:0">共${v.ordered||0}</span>
+                  <label style="color:var(--text-tertiary);font-size:10px;flex-shrink:0">配餘</label>
+                  <span style="font-size:11px;font-weight:700;min-width:20px;text-align:right;flex-shrink:0;color:${remain>0?'var(--green)':remain<0?'var(--red)':' var(--text-tertiary)'}">${remain}</span>
                 </div>`;
               }).join('')}
             </div>`:
-            `<div style="display:flex;align-items:center;gap:6px;margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px;font-size:12px">
-              <label style="color:var(--text-tertiary);font-size:11px">現</label>
-              <input type="number" min="0" value="${p.stock||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','stock',this.value)">
-              <label style="color:var(--text-tertiary);font-size:11px">配</label>
-              <input type="number" min="0" value="${p.ordered||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','ordered',this.value)">
+            `<div style="display:flex;align-items:center;gap:3px;margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px;font-size:11px">
+              <label style="color:var(--text-tertiary);font-size:10px">現</label>
+              <input type="number" min="0" value="${p.stock||0}" style="width:34px;margin:0;padding:1px 2px;font-size:11px;text-align:center" onchange="updateProductStockField('${p.id}','stock',this.value)">
+              <label style="color:var(--text-tertiary);font-size:10px">已買</label>
+              <input type="number" min="0" value="" placeholder="+補" style="width:34px;margin:0;padding:1px 2px;font-size:11px;text-align:center" onchange="updateProductStockField('${p.id}','ordered',this.value)">
+              <span style="font-size:10px;color:var(--text-tertiary)">共${p.ordered||0}</span>
+              <label style="color:var(--text-tertiary);font-size:10px">配餘</label>
+              <span style="font-size:11px;font-weight:700;color:${(p.ordered||0)-(p.allocated||0)>0?'var(--green)':(p.ordered||0)-(p.allocated||0)<0?'var(--red)':' var(--text-tertiary)'}">${(p.ordered||0)-(p.allocated||0)}</span>
             </div>`
           }
         </div>
@@ -1681,9 +1691,9 @@ function calcAllocation(pid, variantName) {
   let remaining;
   if(variantName && p.variants && p.variants.length) {
     const v = p.variants.find(x=>x.name===variantName);
-    remaining = v ? (v.ordered||0) : 0;
+    remaining = v ? Math.max(0,(v.ordered||0)-(v.allocated||0)) : 0;
   } else {
-    remaining = p.ordered||0;
+    remaining = Math.max(0,(p.ordered||0)-(p.allocated||0));
   }
 
   const result = new Map();
@@ -1712,11 +1722,11 @@ window.deleteOrderItem = async function(oid, idx) {
     if(item.variants && item.variants.length) {
       item.variants.forEach(v=>{
         const allocatedQty = getAllocatedQty(oid, idx, item.pid, v.name);
-        if(allocatedQty > 0) adjustOrdered(item.pid, v.name, allocatedQty);
+        if(allocatedQty > 0) adjustAllocated(item.pid, v.name, -allocatedQty);
       });
     } else {
       const allocatedQty = getAllocatedQty(oid, idx, item.pid, item.note||"");
-      if(allocatedQty > 0) adjustOrdered(item.pid, item.note||"", allocatedQty);
+      if(allocatedQty > 0) adjustAllocated(item.pid, item.note||"", -allocatedQty);
     }
   }
   delete itemChecked[key];
@@ -1747,7 +1757,7 @@ window.syncItemStock = async function(oid, idx) {
     const v=p.variants.find(x=>x.name===item.note);
     if(!v){alert(`找不到款式「${item.note}」，請先在商品庫設定款式`);return}
   }
-  adjustOrdered(item.pid, item.note||"", -item.qty);
+  adjustAllocated(item.pid, item.note||"", item.qty);
   syncedItems[`${oid}_${idx}`]=true;
   await saveAll();
   renderCustomers(); renderProducts();
@@ -1860,7 +1870,7 @@ function renderVariantRows(variants) {
           <input type="number" value="${v.stock??0}" min="0" data-vi="${i}" data-vf="stock" style="width:100%;margin:0;font-size:13px;text-align:center" oninput="updateVariantField(this)">
         </div>
         <div style="flex:1">
-          <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:2px">已配貨</div>
+          <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:2px">已買</div>
           <input type="number" value="${v.ordered??0}" min="0" data-vi="${i}" data-vf="ordered" style="width:100%;margin:0;font-size:13px;text-align:center;background:var(--pink-light);color:var(--pink-dark)" oninput="updateVariantField(this)">
         </div>
 
@@ -1972,28 +1982,39 @@ function renderOrderPreview() {
 // adjustOrdered(pid, variantName, delta): adjust ordered count for variant or product
 window.updateVariantStockField = async function(pid, vi, field, val) {
   const p=products.find(x=>x.id===pid); if(!p||!p.variants||!p.variants[vi])return;
-  p.variants[vi][field]=Math.max(0,parseInt(val)||0);
+  const addQty=Math.max(0,parseInt(val)||0);
+  if(field==='ordered') {
+    // 配：累加，不是覆蓋
+    p.variants[vi].ordered=(p.variants[vi].ordered||0)+addQty;
+  } else {
+    p.variants[vi][field]=addQty;
+  }
   await saveAll(); renderProducts();
 };
 window.updateProductStockField = async function(pid, field, val) {
   const p=products.find(x=>x.id===pid); if(!p)return;
-  p[field]=Math.max(0,parseInt(val)||0);
+  const addQty=Math.max(0,parseInt(val)||0);
+  if(field==='ordered') {
+    p.ordered=(p.ordered||0)+addQty;
+  } else {
+    p[field]=addQty;
+  }
   await saveAll(); renderProducts();
 };
 window.initProductStock = async function(pid) {
   const p=products.find(x=>x.id===pid); if(!p)return;
-  p.stock=0; p.ordered=0;
+  p.stock=0; p.ordered=0; p.allocated=0;
   await saveAll(); renderProducts();
 };
 
-function adjustOrdered(pid, variantName, delta) {
+// adjustAllocated: 加單+qty, 刪單/退回-qty, 🔄同步+qty
+function adjustAllocated(pid, variantName, delta) {
   const p=products.find(x=>x.id===pid); if(!p)return;
-  if(p.variants&&p.variants.length) {
-    if(!variantName)return;
+  if(variantName&&p.variants&&p.variants.length) {
     const v=p.variants.find(x=>x.name===variantName); if(!v)return;
-    v.ordered=Math.max(0,(v.ordered||0)+delta);
+    v.allocated=Math.max(0,(v.allocated||0)+delta);
   } else {
-    p.ordered=Math.max(0,(p.ordered||0)+delta);
+    p.allocated=Math.max(0,(p.allocated||0)+delta);
   }
 }
 function adjustStock(pid, variantName, delta) {
@@ -2034,12 +2055,12 @@ window.saveOrder = async function() {
   });
   const items=Object.values(byPid);
   if(!items.length)return;
-  // Deduct ordered for each variant/product
+  // 加單：allocated +qty
   items.forEach(item=>{
     if(item.variants&&item.variants.length) {
-      item.variants.forEach(v=>adjustOrdered(item.pid, v.name, -v.qty));
+      item.variants.forEach(v=>adjustAllocated(item.pid, v.name, v.qty));
     } else {
-      adjustOrdered(item.pid, item.note||"", -item.qty);
+      adjustAllocated(item.pid, item.note||"", item.qty);
     }
   });
   orders.push({id:"o"+Date.now(),cid,items,note:"",autoDeducted:true});
@@ -2096,9 +2117,9 @@ function renderPurchase() {
     let ordered=0;
     if(variantName&&p.variants&&p.variants.length){
       const v=p.variants.find(x=>x.name===variantName);
-      ordered=v?(v.ordered||0):0;
+      ordered=v?Math.max(0,(v.ordered||0)-(v.allocated||0)):0;
     } else {
-      ordered=p.ordered||0;
+      ordered=Math.max(0,(p.ordered||0)-(p.allocated||0));
     }
 
     const shortage=Math.max(0,totalNeeded-ordered);
@@ -2569,6 +2590,16 @@ window.importNewProducts = async function() {
   renderProducts(); renderCatChips(); updateCatList();
   alert(`成功匯入 ${toAdd.length} 項商品！`);
 };
+window.resetAllStock = async function() {
+  if(!confirm("確定要把所有商品的已買和配餘歸零嗎？"))return;
+  products.forEach(p=>{
+    p.ordered=0; p.allocated=0;
+    if(p.variants)p.variants.forEach(v=>{v.ordered=0;v.allocated=0;});
+  });
+  await saveAll(); renderProducts();
+  alert("已清零！請重新輸入已買數量。");
+};
+
 window.recompressAll = async function() {
   const withBase64 = products.filter(p=>p.img&&p.img.startsWith("data:"));
   if(!withBase64.length){alert('所有圖片已是 Cloudinary URL，無需遷移！');return}
