@@ -2120,9 +2120,9 @@ function renderPurchase() {
     let ordered=0;
     if(variantName&&p.variants&&p.variants.length){
       const v=p.variants.find(x=>x.name===variantName);
-      ordered=v?Math.max(0,(v.ordered||0)-(v.allocated||0)):0;
+      ordered=v?(v.ordered||0):0;
     } else {
-      ordered=Math.max(0,(p.ordered||0)-(p.allocated||0));
+      ordered=p.ordered||0;
     }
 
     const shortage=Math.max(0,totalNeeded-ordered);
