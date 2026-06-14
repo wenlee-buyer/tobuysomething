@@ -1662,15 +1662,14 @@ window.syncItemStock = async function(oid, idx) {
   const item=o.items[idx]; if(!item)return;
   const p=products.find(x=>x.id===item.pid);
   if(!p){alert("找不到商品，請確認商品庫");return}
-  // Check variant match if product has variants
   if(p.variants&&p.variants.length&&item.note) {
     const v=p.variants.find(x=>x.name===item.note);
     if(!v){alert(`找不到款式「${item.note}」，請先在商品庫設定款式`);return}
   }
   adjustOrdered(item.pid, item.note||"", -item.qty);
-  item.synced=true; // mark as synced so button disappears
-  await saveAll(); renderCustomers(); renderProducts();
-  alert(`✅ 已同步！配貨 -${item.qty}`);
+  item.synced=true;
+  await saveAll();
+  renderCustomers(); renderProducts();
 };
 function openItemNoteModal(oid, idx, currentNote, variants) {
   const existing=document.getElementById("modal-item-note");
@@ -1723,31 +1722,42 @@ function renderOrderProds() {
   }
   if(!filtered.length){listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-tertiary)">沒有商品</div>';return}
   listEl.innerHTML=cats.map(cat=>`
-    <div id="order-cat-${cat}" style="font-size:11px;font-weight:700;color:var(--text-tertiary);letter-spacing:.6px;text-transform:uppercase;padding:6px 4px 3px">${CAT_EMOJI[cat]||'📦'} ${cat}</div>
+    <div id="order-cat-${cat}" style="font-size:11px;font-weight:700;color:var(--text-tertiary);letter-spacing:.6px;padding:6px 4px 3px">${CAT_EMOJI[cat]||'📦'} ${cat}</div>
     ${byCat[cat].map(p=>{
-      const it=orderItems[p.id];
-      const checked=!!(it&&it.qty>0);
+      const hasVariants=p.variants&&p.variants.length;
+      // Check if any variant (or product itself) is in orderItems
+      const activeKeys=hasVariants
+        ? p.variants.map(v=>`${p.id}|${v.name}`).filter(k=>orderItems[k])
+        : (orderItems[p.id]?[p.id]:[]);
+      const isChecked=activeKeys.length>0;
+      // Total qty across all variants of this product
+      const totalQty=activeKeys.reduce((s,k)=>s+(orderItems[k]?orderItems[k].qty:0),0);
       return `<div style="padding:6px 4px;border-bottom:0.5px solid var(--border)">
         <div style="display:flex;align-items:center;gap:8px">
-          <input type="checkbox" ${checked?'checked':''} onchange="toggleOrderItem('${p.id}',this.checked)" style="width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:var(--pink)">
+          <input type="checkbox" ${isChecked?'checked':''} onchange="toggleOrderItem('${p.id}',this.checked)" style="width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:var(--pink)">
           ${p.img?`<img src="${p.img}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;flex-shrink:0" alt="">`:`<div style="width:28px;height:28px;border-radius:6px;background:var(--gray);flex-shrink:0"></div>`}
-          <span style="flex:1;font-size:13px${checked?';color:var(--pink);font-weight:500':''}">${p.name}</span>
-          <div style="text-align:right;flex-shrink:0">
-            ${checked?`<input type="number" min="1" value="${it.qty}" data-pid="${p.id}" style="width:46px;margin:0;padding:3px 4px;font-size:12px;text-align:center" onchange="setOItemQty('${p.id}',this.value)">
-            <input type="number" placeholder="改價" data-pid-price="${p.id}" value="${it.price!==p.price?it.price:''}" style="width:60px;margin:3px 0 0;padding:3px 4px;font-size:11px;text-align:center" onchange="setOItemPrice(this)">
-            `:`<div>
-              <span style="font-size:11px;color:var(--pink);cursor:pointer" onclick="toggleOrderItem('${p.id}',true)">定 NT$${p.price}</span>
-              ${p.salePrice?`<br><span style="font-size:11px;color:var(--green);cursor:pointer" onclick="toggleOrderItemSale('${p.id}')">優 NT$${p.salePrice}</span>`:''}
-            </div>`}
+          <span style="flex:1;font-size:13px${isChecked?';color:var(--pink);font-weight:500':''}">${p.name}</span>
+          <div style="text-align:right;flex-shrink:0;font-size:11px;color:var(--text-secondary)">
+            ${isChecked?`小計 ×${totalQty}`:`<span style="color:var(--pink)">定 NT$${p.price}</span>${p.salePrice?`<br><span style="color:var(--green);cursor:pointer" onclick="toggleOrderItemSale('${p.id}')">優 NT$${p.salePrice}</span>`:''}`}
           </div>
         </div>
-        ${checked?(p.variants&&p.variants.length?
-          `<select data-pid-note="${p.id}" style="margin:4px 0 0 26px;width:calc(100% - 26px);padding:4px 8px;font-size:12px;color:var(--text-secondary)" onchange="setOItemNote(this)">
-            <option value="">— 選款式 —</option>
-            ${p.variants.map(v=>`<option value="${v.name}" ${it&&it.note===v.name?'selected':''}>${v.name}（配${v.ordered||0}）</option>`).join('')}
-          </select>`:
-          `<input type="text" placeholder="備註" data-pid-note="${p.id}" value="${it&&it.note?it.note:''}" style="margin:4px 0 0 26px;width:calc(100% - 26px);padding:4px 8px;font-size:12px;color:var(--text-secondary)" oninput="setOItemNote(this)">`)
-        :''}
+        ${isChecked?`<div style="margin-top:6px;margin-left:26px">
+          ${hasVariants?p.variants.map(v=>{
+            const key=`${p.id}|${v.name}`;
+            const it=orderItems[key];
+            return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <span style="flex:1;font-size:12px;color:var(--text-secondary)">${v.name}<span style="font-size:10px;color:var(--text-tertiary);margin-left:4px">配${v.ordered||0}</span></span>
+              <input type="number" min="0" value="${it?it.qty:0}" style="width:46px;margin:0;padding:3px 4px;font-size:12px;text-align:center" onchange="setVariantQty('${p.id}','${v.name}',this.value)">
+              <input type="number" placeholder="改價" value="${it&&it.price!==p.price?it.price:''}" style="width:56px;margin:0;padding:3px 4px;font-size:11px;text-align:center" onchange="setVariantPrice('${p.id}','${v.name}',this.value)">
+            </div>`;
+          }).join(''):
+          `<div style="display:flex;align-items:center;gap:6px">
+            <span style="flex:1;font-size:12px;color:var(--text-tertiary)">備註</span>
+            <input type="number" min="1" value="${orderItems[p.id]?orderItems[p.id].qty:1}" style="width:46px;margin:0;padding:3px 4px;font-size:12px;text-align:center" onchange="setOItemQty('${p.id}',this.value)">
+            <input type="number" placeholder="改價" value="${orderItems[p.id]&&orderItems[p.id].price!==p.price?orderItems[p.id].price:''}" style="width:56px;margin:0;padding:3px 4px;font-size:11px;text-align:center" onchange="setOItemPrice({dataset:{pidPrice:'${p.id}'},value:this.value})">
+          </div>
+          <input type="text" placeholder="備註" value="${orderItems[p.id]?orderItems[p.id].note:''}" style="width:100%;margin-top:4px;padding:4px 8px;font-size:12px;color:var(--text-secondary)" oninput="setOItemNote({dataset:{pidNote:'${p.id}'},value:this.value})">`}
+        </div>`:''}
       </div>`;
     }).join('')}`).join('');
 }
@@ -1799,9 +1809,36 @@ function getVariantRows() {
 
 window.toggleOrderItem = function(pid, checked) {
   const p=products.find(x=>x.id===pid); if(!p)return;
-  if(checked) orderItems[pid]={pid,name:p.name,qty:1,price:p.price,originalPrice:p.price,note:""};
-  else delete orderItems[pid];
+  if(checked) {
+    if(p.variants&&p.variants.length) {
+      // Add first variant as default entry so product shows as checked
+      p.variants.forEach(v=>{ orderItems[`${pid}|${v.name}`]={pid,name:p.name,qty:0,price:p.price,originalPrice:p.price,note:v.name}; });
+    } else {
+      orderItems[pid]={pid,name:p.name,qty:1,price:p.price,originalPrice:p.price,note:""};
+    }
+  } else {
+    if(p.variants&&p.variants.length) {
+      p.variants.forEach(v=>delete orderItems[`${pid}|${v.name}`]);
+    } else {
+      delete orderItems[pid];
+    }
+  }
   renderOrderProds(); renderOrderPreview();
+};
+window.setVariantQty = function(pid, variantName, val) {
+  const key=`${pid}|${variantName}`;
+  const p=products.find(x=>x.id===pid); if(!p)return;
+  const qty=parseInt(val)||0;
+  if(qty<=0) { orderItems[key]={pid,name:p.name,qty:0,price:p.price,originalPrice:p.price,note:variantName}; }
+  else { if(!orderItems[key]) orderItems[key]={pid,name:p.name,qty:0,price:p.price,originalPrice:p.price,note:variantName}; orderItems[key].qty=qty; }
+  renderOrderPreview();
+};
+window.setVariantPrice = function(pid, variantName, val) {
+  const key=`${pid}|${variantName}`;
+  const p=products.find(x=>x.id===pid); if(!p)return;
+  if(!orderItems[key])return;
+  orderItems[key].price=val?parseFloat(val):p.price;
+  renderOrderPreview();
 };
 window.toggleOrderItemSale = function(pid) {
   const p=products.find(x=>x.id===pid); if(!p||!p.salePrice)return;
@@ -1881,9 +1918,8 @@ function adjustStock(pid, variantName, delta) {
 
 window.saveOrder = async function() {
   const cid=document.getElementById("order-cid").value;
-  const items=Object.values(orderItems);
+  const items=Object.values(orderItems).filter(i=>i.qty>0);
   if(!items.length)return;
-  // 加單確認時扣「配」(ordered) -qty
   items.forEach(item=>adjustOrdered(item.pid, item.note||"", -item.qty));
   orders.push({id:"o"+Date.now(),cid,items,note:""});
   await saveAll(); closeModal("modal-order"); renderCustomers(); renderPurchase(); renderPayments(); renderProducts();
