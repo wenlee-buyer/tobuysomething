@@ -1535,11 +1535,10 @@ function renderCustomers() {
           const catalogPrice=p?p.price:i.price;
           const priceChanged=p&&i.originalPrice!==undefined&&catalogPrice!==i.originalPrice;
           const checked=isItemChecked(c.id,o.id,idx);
-          // 缺貨顏色判斷
+          // 缺貨顏色：以款式為單位判斷
           let isShortage = false;
           if(!checked) {
             if(i.variants && i.variants.length) {
-              // 有款式：任何一款沒被完整分配到就是缺貨
               isShortage = i.variants.some(v=> getAllocatedQty(o.id, idx, i.pid, v.name) < v.qty);
             } else {
               isShortage = getAllocatedQty(o.id, idx, i.pid, i.note||"") < i.qty;
@@ -1656,61 +1655,52 @@ window.deleteOrder = async function(oid) {
 // ── ALLOCATION HELPER ──
 // 依 order 建立時間排序，計算每筆品項是否被 ordered 配到
 // 回傳 Map: oid -> { allocated: qty } 表示這筆訂單實際被分配到的數量
+// 每個 pid+variantName 是獨立 SKU，分開計算分配
+// variantName: 款式名稱（新格式 variants[].name 或 舊格式 item.note），無款式傳 ""
 function calcAllocation(pid, variantName) {
-  // 收集所有包含這個 pid+variant 的品項，依 order 時間排序
   const entries = [];
   orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>{
-    // order.id 格式是 "o" + timestamp
     const ts = parseInt(o.id.replace(/^o/,'')) || 0;
-    o.items.forEach((item, idx)=>{
+    o.items.forEach((item, itemIdx)=>{
       if(item.pid !== pid) return;
-      // 有款式
       if(item.variants && item.variants.length) {
-        item.variants.forEach(v=>{
-          if(v.name === variantName) entries.push({oid:o.id, idx, variantName:v.name, qty:v.qty, ts});
-        });
+        // 新格式：每個款式獨立
+        const v = item.variants.find(x=>x.name===variantName);
+        if(v && v.qty>0) entries.push({oid:o.id, itemIdx, variantName, qty:v.qty, ts});
       } else {
-        // 無款式：variantName 傳 "" 或 note
+        // 舊格式 or 無款式
         const itemNote = item.note||"";
-        if(itemNote === (variantName||"")) entries.push({oid:o.id, idx, variantName:itemNote, qty:item.qty, ts});
+        if(itemNote === (variantName||"")) entries.push({oid:o.id, itemIdx, variantName:itemNote, qty:item.qty, ts});
       }
     });
   });
   entries.sort((a,b)=>a.ts-b.ts);
 
-  // 取 ordered 數量
+  // 取這個 SKU 的 ordered 量
   const p = products.find(x=>x.id===pid); if(!p) return new Map();
   let remaining;
-  if(p.variants && p.variants.length) {
+  if(variantName && p.variants && p.variants.length) {
     const v = p.variants.find(x=>x.name===variantName);
     remaining = v ? (v.ordered||0) : 0;
   } else {
     remaining = p.ordered||0;
   }
 
-  // 依序分配
   const result = new Map();
   entries.forEach(e=>{
     const allocated = Math.max(0, Math.min(e.qty, remaining));
-    result.set(`${e.oid}_${e.idx}_${e.variantName}`, allocated);
+    result.set(`${e.oid}__${e.itemIdx}__${e.variantName}`, allocated);
     remaining -= allocated;
   });
   return result;
 }
 
-// 判斷某個品項是否有被 ordered 分配到（有被配到才在刪除時退回）
-function isItemAllocated(oid, idx, pid, variantName) {
+function getAllocatedQty(oid, itemIdx, pid, variantName) {
   const alloc = calcAllocation(pid, variantName||"");
-  const key = `${oid}_${idx}_${variantName||""}`;
-  return (alloc.get(key)||0) > 0;
+  return alloc.get(`${oid}__${itemIdx}__${variantName||""}`)||0;
 }
 
-// 取得某品項實際被分配到的數量
-function getAllocatedQty(oid, idx, pid, variantName) {
-  const alloc = calcAllocation(pid, variantName||"");
-  const key = `${oid}_${idx}_${variantName||""}`;
-  return alloc.get(key)||0;
-}
+
 
 window.deleteOrderItem = async function(oid, idx) {
   const o=orders.find(x=>x.id===oid); if(!o)return;
@@ -2072,28 +2062,23 @@ let ledgerEntries = [];
 
 function renderPurchase() {
   const el=document.getElementById("purchase-list");
-  const all={};
+  const shortages = {};
 
-  // 依訂單時間順序，計算每個商品/款式的缺口
-  // 先收集所有 pid+variantName 組合
-  const pidVariants = new Set();
+  const skus = new Set();
   orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach(item=>{
-    const p=products.find(x=>x.id===item.pid);
-    if(!p)return;
+    const p=products.find(x=>x.id===item.pid); if(!p)return;
     if(item.variants&&item.variants.length){
-      item.variants.forEach(v=>pidVariants.add(`${item.pid}|${v.name}`));
+      item.variants.forEach(v=>skus.add(`${item.pid}|${v.name}`));
     } else {
-      pidVariants.add(`${item.pid}|${item.note||""}`);
+      skus.add(`${item.pid}|${item.note||""}`);
     }
   }));
 
-  // 計算每個組合的缺口
-  pidVariants.forEach(pv=>{
-    const [pid, variantName]=pv.split('|');
-    const p=products.find(x=>x.id===pid); if(!p)return;
-    if(archivedProducts[pid])return;
+  skus.forEach(sku=>{
+    const sep=sku.indexOf('|');
+    const pid=sku.slice(0,sep), variantName=sku.slice(sep+1);
+    const p=products.find(x=>x.id===pid); if(!p||archivedProducts[pid])return;
 
-    // 總訂單需求
     let totalNeeded=0;
     orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((item,idx)=>{
       if(item.pid!==pid)return;
@@ -2108,53 +2093,44 @@ function renderPurchase() {
     }));
     if(!totalNeeded)return;
 
-    // ordered 量：有款式的商品用 variantName 找對應款式的 ordered
     let ordered=0;
-    if(p.variants&&p.variants.length){
+    if(variantName&&p.variants&&p.variants.length){
       const v=p.variants.find(x=>x.name===variantName);
       ordered=v?(v.ordered||0):0;
     } else {
       ordered=p.ordered||0;
     }
 
-    const shortage=Math.max(0, totalNeeded-ordered);
+    const shortage=Math.max(0,totalNeeded-ordered);
     if(!shortage)return;
 
     const cat=p.cat||"其他";
-    if(!all[cat])all[cat]={};
-    if(!all[cat][pid])all[cat][pid]={pid,name:p.name,img:p.img||"",totalQty:0,variantNeeds:{}};
-    // 只有商品有設款式，或 variantName 不為空時才縮排顯示款式
-    if((p.variants&&p.variants.length)||variantName){
-      all[cat][pid].variantNeeds[variantName||"（未指定款式）"]=(all[cat][pid].variantNeeds[variantName||"（未指定款式）"]||0)+shortage;
-    }
-    all[cat][pid].totalQty+=shortage;
+    if(!shortages[cat])shortages[cat]=[];
+    const displayName=(variantName&&p.variants&&p.variants.length)
+      ?`${p.name} — ${variantName}`
+      :p.name;
+    shortages[cat].push({pid,displayName,img:p.img||"",shortage});
   });
 
-  if(!Object.keys(all).length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">太棒了！目前沒有缺貨</div>';return}
-  const catOrder=[...new Set(["樂天世界商品","楓之谷網咖","快閃店","其他",...Object.keys(all)])];
+  if(!Object.keys(shortages).length){
+    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">目前沒有缺貨 🎉</div>';return;
+  }
+
+  const catOrder=[...new Set(["樂天世界商品","楓之谷網咖","快閃店","其他",...Object.keys(shortages)])];
   let html="";
-  catOrder.filter(c=>all[c]).forEach(cat=>{
-    let rows="";
-    Object.values(all[cat]).forEach(i=>{
-      const hasVariants=Object.keys(i.variantNeeds).length>0;
-      const variantLines=hasVariants
-        ? Object.entries(i.variantNeeds).filter(([,qty])=>qty>0)
-            .map(([name,qty])=>`<div style="font-size:12px;color:var(--red);margin-left:44px;padding:1px 0">└ ${name} ×${qty}</div>`).join('')
-        : '';
-      rows+=`<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
+  catOrder.filter(c=>shortages[c]&&shortages[c].length).forEach(cat=>{
+    const rows=shortages[cat].map(i=>`
+      <div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
         <div style="display:flex;align-items:center;gap:8px">
           ${i.img?`<img src="${i.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
-          <span style="flex:1;font-size:14px">${i.name}</span>
-          <span style="font-size:13px;font-weight:700;color:var(--red)">缺 ×${i.totalQty}</span>
+          <span style="flex:1;font-size:13px">${i.displayName}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--red)">缺 ×${i.shortage}</span>
         </div>
-        ${variantLines}
-      </div>`;
-    });
-    if(!rows)return;
+      </div>`).join('');
     html+=`<div class="sec-title">${CAT_EMOJI[cat]||""} ${cat}</div>
       <div class="card" style="border-left:3px solid ${CAT_COLOR[cat]||"var(--pink)"};">${rows}</div>`;
   });
-  el.innerHTML=html||'<div style="text-align:center;padding:20px;color:var(--text-tertiary)">太棒了！目前沒有缺貨</div>';
+  el.innerHTML=html;
 }
 window.togglePurchaseDone = function(cat) {
   const el=document.getElementById(`purchase-done-${cat}`);
