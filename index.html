@@ -1350,28 +1350,21 @@ function renderProducts() {
           ${p.variants&&p.variants.length?
             `<div style="margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px">
               ${p.variants.map((v,vi)=>{
-                const avail=(v.stock||0)-(v.allocated||0);
                 return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12px">
                   <span style="flex:1;color:var(--text-secondary)">${v.name}</span>
                   <label style="color:var(--text-tertiary);font-size:11px">現</label>
                   <input type="number" min="0" value="${v.stock||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateVariantStockField('${p.id}',${vi},'stock',this.value)">
                   <label style="color:var(--text-tertiary);font-size:11px">配</label>
-                  <input type="number" min="0" value="${v.allocated||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateVariantStockField('${p.id}',${vi},'allocated',this.value)">
-                  <span style="font-size:11px;font-weight:700;min-width:28px;text-align:right;color:${avail<0?'var(--red)':avail>0?'var(--green)':'var(--text-tertiary)'}">可${avail}</span>
+                  <input type="number" min="0" value="${v.ordered||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateVariantStockField('${p.id}',${vi},'ordered',this.value)">
                 </div>`;
               }).join('')}
             </div>`:
-            ((p.stock!==undefined||p.allocated!==undefined)?
-              `<div style="display:flex;align-items:center;gap:6px;margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px;font-size:12px">
-                <label style="color:var(--text-tertiary);font-size:11px">現</label>
-                <input type="number" min="0" value="${p.stock||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','stock',this.value)">
-                <label style="color:var(--text-tertiary);font-size:11px">配</label>
-                <input type="number" min="0" value="${p.allocated||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','allocated',this.value)">
-                <span style="font-size:11px;font-weight:700;min-width:28px;color:${getAvail(p.id,'')<0?'var(--red)':getAvail(p.id,'')>0?'var(--green)':'var(--text-tertiary)'}">可${getAvail(p.id,'')}</span>
-              </div>`:
-              `<div style="margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px">
-                <button class="btn btn-sm" style="font-size:11px;color:var(--text-tertiary)" onclick="initProductStock('${p.id}')"><i class="ti ti-package"></i> 設定庫存</button>
-              </div>`)
+            `<div style="display:flex;align-items:center;gap:6px;margin-top:6px;border-top:0.5px solid var(--border);padding-top:6px;font-size:12px">
+              <label style="color:var(--text-tertiary);font-size:11px">現</label>
+              <input type="number" min="0" value="${p.stock||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','stock',this.value)">
+              <label style="color:var(--text-tertiary);font-size:11px">配</label>
+              <input type="number" min="0" value="${p.ordered||0}" style="width:44px;margin:0;padding:2px 4px;font-size:12px;text-align:center" onchange="updateProductStockField('${p.id}','ordered',this.value)">
+            </div>`
           }
         </div>
         <div style="text-align:right;flex-shrink:0">
@@ -1538,7 +1531,7 @@ function renderCustomers() {
             <div style="display:flex;align-items:center;gap:8px">
               <input type="checkbox" ${checked?'checked':''} onchange="toggleItemChecked('${c.id}','${o.id}',${idx},this.checked)" style="width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:var(--green)">
               ${p&&p.img?`<img src="${p.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
-              <span style="flex:1;font-size:13px${checked?';text-decoration:line-through;color:var(--text-tertiary)':(getAvail(i.pid,i.note||"")<0?';color:var(--red);font-weight:600':'')}">${displayName}${getAvail(i.pid,i.note||"")<0?" ⚠️":""}</span>
+              <span style="flex:1;font-size:13px${checked?';text-decoration:line-through;color:var(--text-tertiary)':''}">${displayName}</span>
               ${p?catTag(p.cat):""}
               <span style="color:var(--text-secondary);font-size:12px;margin:0 4px">x${i.qty}</span>
               <span style="font-weight:700;font-size:13px">${priceChanged?`<span style="text-decoration:line-through;color:var(--text-tertiary);font-size:11px">原NT$${(i.originalPrice*i.qty).toLocaleString()}</span> <span style="color:var(--amber)">現NT$${(catalogPrice*i.qty).toLocaleString()}</span><br>客人價 NT$${(i.price*i.qty).toLocaleString()}`:`NT$${(i.price*i.qty).toLocaleString()}`}</span>
@@ -1643,8 +1636,8 @@ window.deleteOrderItem = async function(oid, idx) {
   const item=o.items[idx];
   const cid=o.cid;
   const key=`${cid}_${oid}_${idx}`;
-  // 刪除品項一律退還已配貨
-  if(item) adjustAlloc(item.pid, item.note||"", -item.qty);
+  // 刪除品項退回「配」(ordered) +qty
+  if(item) adjustOrdered(item.pid, item.note||"", item.qty);
   delete itemChecked[key];
   o.items.splice(idx,1);
   if(o.items.length===0) orders=orders.filter(x=>x.id!==oid);
@@ -1674,11 +1667,10 @@ window.syncItemStock = async function(oid, idx) {
     const v=p.variants.find(x=>x.name===item.note);
     if(!v){alert(`找不到款式「${item.note}」，請先在商品庫設定款式`);return}
   }
-  adjustAlloc(item.pid, item.note||"", item.qty);
+  adjustOrdered(item.pid, item.note||"", -item.qty);
   item.synced=true; // mark as synced so button disappears
-  const avail=getAvail(item.pid, item.note||"");
   await saveAll(); renderCustomers(); renderProducts();
-  alert(`✅ 已同步！已配貨 +${item.qty}，現在可配貨 ${avail}`);
+  alert(`✅ 已同步！配貨 -${item.qty}`);
 };
 function openItemNoteModal(oid, idx, currentNote, variants) {
   const existing=document.getElementById("modal-item-note");
@@ -1692,7 +1684,7 @@ function openItemNoteModal(oid, idx, currentNote, variants) {
     <div class="modal-title">修改款式</div>
     <select id="item-note-select" style="margin-bottom:12px">
       <option value="">— 不指定 —</option>
-      ${variants.map(v=>{const avail=(v.stock||0)-(v.allocated||0);return `<option value="${v.name}" ${currentNote===v.name?'selected':''}>${v.name}（可配${avail}）</option>`;}).join('')}
+      ${variants.map(v=>`<option value="${v.name}" ${currentNote===v.name?'selected':''}>${v.name}（配${v.ordered||0}）</option>`).join('')}
     </select>
     <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:12px">改款式後，按備註旁的 🔄 才會同步扣庫存</div>
     <div style="display:flex;gap:8px">
@@ -1752,7 +1744,7 @@ function renderOrderProds() {
         ${checked?(p.variants&&p.variants.length?
           `<select data-pid-note="${p.id}" style="margin:4px 0 0 26px;width:calc(100% - 26px);padding:4px 8px;font-size:12px;color:var(--text-secondary)" onchange="setOItemNote(this)">
             <option value="">— 選款式 —</option>
-            ${p.variants.map(v=>{const avail=(v.stock||0)-(v.allocated||0);return `<option value="${v.name}" ${it&&it.note===v.name?'selected':''}>${v.name}（可配${avail}）</option>`;}).join('')}
+            ${p.variants.map(v=>`<option value="${v.name}" ${it&&it.note===v.name?'selected':''}>${v.name}（配${v.ordered||0}）</option>`).join('')}
           </select>`:
           `<input type="text" placeholder="備註" data-pid-note="${p.id}" value="${it&&it.note?it.note:''}" style="margin:4px 0 0 26px;width:calc(100% - 26px);padding:4px 8px;font-size:12px;color:var(--text-secondary)" oninput="setOItemNote(this)">`)
         :''}
@@ -1765,7 +1757,6 @@ function renderVariantRows(variants) {
   const el=document.getElementById("p-variants-list"); if(!el)return;
   if(!variants.length){el.innerHTML='<div style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px">無款式設定，備註欄為自由輸入</div>';return}
   el.innerHTML=variants.map((v,i)=>{
-    const avail=(v.stock||0)-(v.allocated||0);
     return `<div style="margin-bottom:8px;padding:6px 8px;background:var(--gray);border-radius:8px">
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
         <input type="text" placeholder="款式名稱（如：Cinema款）" value="${v.name||''}" data-vi="${i}" data-vf="name" style="flex:1;margin:0;font-size:12px" oninput="updateVariantField(this)">
@@ -1778,12 +1769,9 @@ function renderVariantRows(variants) {
         </div>
         <div style="flex:1">
           <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:2px">已配貨</div>
-          <input type="number" value="${v.allocated??0}" min="0" data-vi="${i}" data-vf="allocated" style="width:100%;margin:0;font-size:13px;text-align:center;background:var(--pink-light);color:var(--pink-dark)" oninput="updateVariantField(this)">
+          <input type="number" value="${v.ordered??0}" min="0" data-vi="${i}" data-vf="ordered" style="width:100%;margin:0;font-size:13px;text-align:center;background:var(--pink-light);color:var(--pink-dark)" oninput="updateVariantField(this)">
         </div>
-        <div style="flex:1;text-align:center">
-          <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:2px">可配貨</div>
-          <div style="font-size:14px;font-weight:700;color:${avail>0?'var(--green)':avail<0?'var(--red)':'var(--text-tertiary)'}">${avail}</div>
-        </div>
+
       </div>
     </div>`;
   }).join('');
@@ -1804,7 +1792,7 @@ function getVariantRows() {
   rows.forEach(inp=>{
     const i=parseInt(inp.dataset.vi); const f=inp.dataset.vf;
     if(!map[i])map[i]={};
-    map[i][f]=["stock","allocated"].includes(f)?parseInt(inp.value)||0:inp.value;
+    map[i][f]=["stock","ordered"].includes(f)?parseInt(inp.value)||0:inp.value;
   });
   return Object.values(map).filter(v=>v.name);
 }
@@ -1862,7 +1850,7 @@ function renderOrderPreview() {
   </div>`;
 }
 // ── STOCK HELPER ──
-// adjustAlloc(pid, variantName, delta): add delta to allocated for variant (or product if no variants)
+// adjustOrdered(pid, variantName, delta): adjust ordered count for variant or product
 window.updateVariantStockField = async function(pid, vi, field, val) {
   const p=products.find(x=>x.id===pid); if(!p||!p.variants||!p.variants[vi])return;
   p.variants[vi][field]=Math.max(0,parseInt(val)||0);
@@ -1875,21 +1863,10 @@ window.updateProductStockField = async function(pid, field, val) {
 };
 window.initProductStock = async function(pid) {
   const p=products.find(x=>x.id===pid); if(!p)return;
-  p.stock=0; p.allocated=0;
+  p.stock=0; p.ordered=0;
   await saveAll(); renderProducts();
 };
 
-function adjustAlloc(pid, variantName, delta) {
-  const p=products.find(x=>x.id===pid); if(!p)return;
-  if(p.variants&&p.variants.length) {
-    if(!variantName)return; // no variant selected, skip
-    const v=p.variants.find(x=>x.name===variantName); if(!v)return;
-    v.allocated=Math.max(0,(v.allocated||0)+delta);
-  } else {
-    // no variants = single SKU, track on product directly
-    p.allocated=Math.max(0,(p.allocated||0)+delta);
-  }
-}
 function adjustStock(pid, variantName, delta) {
   const p=products.find(x=>x.id===pid); if(!p)return;
   if(p.variants&&p.variants.length) {
@@ -1900,21 +1877,14 @@ function adjustStock(pid, variantName, delta) {
     p.stock=Math.max(0,(p.stock||0)+delta);
   }
 }
-function getAvail(pid, variantName) {
-  const p=products.find(x=>x.id===pid); if(!p)return 0;
-  if(p.variants&&p.variants.length) {
-    const v=p.variants.find(x=>x.name===variantName); if(!v)return 0;
-    return (v.stock||0)-(v.allocated||0);
-  }
-  return (p.stock||0)-(p.allocated||0);
-}
+
 
 window.saveOrder = async function() {
   const cid=document.getElementById("order-cid").value;
   const items=Object.values(orderItems);
   if(!items.length)return;
-  // 加單確認時扣已配貨
-  items.forEach(item=>adjustAlloc(item.pid, item.note||"", item.qty));
+  // 加單確認時扣「配」(ordered) -qty
+  items.forEach(item=>adjustOrdered(item.pid, item.note||"", -item.qty));
   orders.push({id:"o"+Date.now(),cid,items,note:""});
   await saveAll(); closeModal("modal-order"); renderCustomers(); renderPurchase(); renderPayments(); renderProducts();
 };
@@ -1950,7 +1920,7 @@ function renderPurchase() {
     if(archivedProducts[p.id])return;
     if(p.variants&&p.variants.length) {
       p.variants.forEach(v=>{
-        const avail=(v.stock||0)-(v.allocated||0);
+        const avail=(v.ordered||0);
         if(avail>=0)return;
         const cat=p.cat||"其他";
         if(!all[cat])all[cat]={};
@@ -1959,8 +1929,8 @@ function renderPurchase() {
         all[cat][key].shortage=(all[cat][key].shortage||0)+Math.abs(avail);
       });
     } else {
-      const avail=(p.stock||0)-(p.allocated||0);
-      if(avail>=0)return;
+      const avail=(p.ordered||0);
+      if(avail>0)return; // still has ordered stock, not a shortage
       const cat=p.cat||"其他";
       if(!all[cat])all[cat]={};
       const key=p.id+"|"+p.name;
