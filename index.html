@@ -1616,15 +1616,12 @@ window.openAddCustomer = function() {
   openModal("modal-customer");
 };
 window.editCustomer = function(id) {
-  console.log("editCustomer called:", id);
-  const c=customers.find(x=>x.id===id); if(!c){console.log("customer not found");return;}
+  const c=customers.find(x=>x.id===id); if(!c)return;
   document.getElementById("modal-customer-title").textContent="編輯客人";
   document.getElementById("edit-cid").value=id;
   document.getElementById("c-code").value=c.code;
-  document.getElementById("c-name").value=c.name||"";
   document.getElementById("c-source").value=c.source;
   document.getElementById("c-note").value=c.note||"";
-  console.log("opening modal");
   openModal("modal-customer");
 };
 window.saveCustomer = async function() {
