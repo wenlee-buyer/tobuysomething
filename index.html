@@ -1616,13 +1616,15 @@ window.openAddCustomer = function() {
   openModal("modal-customer");
 };
 window.editCustomer = function(id) {
-  const c=customers.find(x=>x.id===id); if(!c)return;
+  console.log("editCustomer called:", id);
+  const c=customers.find(x=>x.id===id); if(!c){console.log("customer not found");return;}
   document.getElementById("modal-customer-title").textContent="編輯客人";
   document.getElementById("edit-cid").value=id;
   document.getElementById("c-code").value=c.code;
   document.getElementById("c-name").value=c.name||"";
   document.getElementById("c-source").value=c.source;
   document.getElementById("c-note").value=c.note||"";
+  console.log("opening modal");
   openModal("modal-customer");
 };
 window.saveCustomer = async function() {
@@ -2354,7 +2356,13 @@ window.toggleShipping = async function(cid, field, checked) {
     // Adjust stock for all items in this customer's orders
     const cOrds=orders.filter(o=>o.cid===cid);
     cOrds.forEach(o=>o.items.forEach(item=>{
-      adjustStock(item.pid, item.note||"", checked ? item.qty : -item.qty);
+      if(item.variants&&item.variants.length){
+        // 新格式：每個款式各自扣
+        item.variants.forEach(v=>adjustStock(item.pid, v.name, checked ? -v.qty : v.qty));
+      } else {
+        // 舊格式/無款式
+        adjustStock(item.pid, item.note||"", checked ? -item.qty : item.qty);
+      }
     }));
   }
   await saveAll(); renderPayments(); renderProducts();
