@@ -2001,7 +2001,7 @@ function getTotalNeeded(pid, variantName) {
   const p=products.find(x=>x.id===pid);
   const hasVariants=p&&p.variants&&p.variants.length;
   let total=0;
-  orders.filter(o=>!(shippingState[o.cid]||{}).shipped).forEach(o=>o.items.forEach((item,idx)=>{
+  orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((item,idx)=>{
     if(item.pid!==pid)return;
     if(item.variants&&item.variants.length){
       // 新格式
@@ -2051,6 +2051,16 @@ window.initProductStock = async function(pid) {
 };
 
 // adjustAllocated: 加單+qty, 刪單/退回-qty, 🔄同步+qty
+function adjustOrdered(pid, variantName, delta) {
+  const p=products.find(x=>x.id===pid); if(!p)return;
+  if(variantName&&p.variants&&p.variants.length){
+    const v=p.variants.find(x=>x.name===variantName); if(!v)return;
+    v.ordered=Math.max(0,(v.ordered||0)+delta);
+  } else {
+    p.ordered=Math.max(0,(p.ordered||0)+delta);
+  }
+}
+
 function adjustAllocated(pid, variantName, delta) {
   const p=products.find(x=>x.id===pid); if(!p)return;
   if(variantName&&p.variants&&p.variants.length) {
@@ -2135,7 +2145,7 @@ function renderPurchase() {
   const el=document.getElementById("purchase-list");
 
   // 收集所有有效訂單（排除封存+全打勾客人）
-  const validOrders=orders.filter(o=>!archivedCustomers[o.cid]&&!(shippingState[o.cid]||{}).shipped);
+  const validOrders=orders.filter(o=>!archivedCustomers[o.cid]);
 
   // 以商品為單位計算缺口
   const byProduct={};
@@ -2425,8 +2435,16 @@ window.archiveCustomer = async function(cid) {
   const cOrds=orders.filter(o=>o.cid===cid);
   const pay=payments.find(p=>p.cid===cid)||null;
   const total=cOrds.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.price*i.qty,0),0);
+  // 封存時扣 ordered，讓配餘不變
+  cOrds.forEach(o=>o.items.forEach(item=>{
+    if(item.variants&&item.variants.length){
+      item.variants.forEach(v=>adjustOrdered(item.pid, v.name, -v.qty));
+    } else {
+      adjustOrdered(item.pid, item.note||"", -item.qty);
+    }
+  }));
   archivedCustomers[cid]={customer:c,orders:cOrds,payment:pay,total,archivedAt:new Date().toISOString()};
-  await saveAll(); renderCustomers(); renderPayments();
+  await saveAll(); renderCustomers(); renderPayments(); renderProducts();
 };
 
 window.archiveTwoWeeks = async function() {
@@ -2443,6 +2461,14 @@ window.archiveTwoWeeks = async function() {
     const cOrds=orders.filter(o=>o.cid===c.id);
     const pay=payments.find(p=>p.cid===c.id)||null;
     const total=cOrds.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.price*i.qty,0),0);
+    // 封存時扣 ordered，讓配餘不變
+    cOrds.forEach(o=>o.items.forEach(item=>{
+      if(item.variants&&item.variants.length){
+        item.variants.forEach(v=>adjustOrdered(item.pid, v.name, -v.qty));
+      } else {
+        adjustOrdered(item.pid, item.note||"", -item.qty);
+      }
+    }));
     archivedCustomers[c.id]={customer:c,orders:cOrds,payment:pay,total,archivedAt:new Date().toISOString()};
   });
   await saveAll(); renderCustomers(); renderPayments();
