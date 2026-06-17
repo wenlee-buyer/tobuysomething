@@ -2327,7 +2327,7 @@ function renderPayments() {
         <span class="tag tag-${c.source}">${c.source}</span>
         ${notified?'<span style="font-size:11px;color:var(--green)">✅已通知</span>':''}
         <button class="btn btn-sm" onclick="toggleEl('${uid}')" style="font-size:11px;padding:2px 7px;color:var(--text-secondary)">品項 ${allItems.length} ▾</button>
-        ${isShipped?`<button class="btn btn-sm" onclick="archiveCustomer('${c.id}')" style="font-size:11px;padding:2px 7px;color:var(--amber);border-color:var(--amber)"><i class="ti ti-archive"></i> 封存</button>`:''}
+        ${st.shipped?`<button class="btn btn-sm" onclick="archiveCustomer('${c.id}')" style="font-size:11px;padding:2px 7px;color:var(--amber);border-color:var(--amber)"><i class="ti ti-archive"></i> 封存</button>`:''}
         <button class="btn btn-sm" onclick="openPayModal('${c.id}')" style="margin-left:auto;color:var(--pink);border-color:var(--pink);padding:3px 8px"><i class="ti ti-edit"></i></button>
       </div>
       <div id="${uid}" style="display:none;margin-top:6px;padding-top:4px">
