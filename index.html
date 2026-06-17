@@ -2369,7 +2369,7 @@ function renderPayments() {
   let grand=0,grandPaid=0,grandKrw=0,grandTwd=0;
   [...zone1,...zone2,...zone3].forEach(c=>{
     const cOrds=orders.filter(o=>o.cid===c.id);
-    const pay=payments.find(p=>p.cid===c.id);
+    const pay=payments.find(p=>p.cid===c.id)||null;
     const total=cOrds.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.price*i.qty,0),0);
     const paid=pay?pay.amount:0;
     const discount=pay?pay.discount||0:0;
@@ -2423,7 +2423,7 @@ window.toggleShippedZone = function() {
 window.archiveCustomer = async function(cid) {
   const c=customers.find(x=>x.id===cid); if(!c)return;
   const cOrds=orders.filter(o=>o.cid===cid);
-  const pay=payments.find(p=>p.cid===cid);
+  const pay=payments.find(p=>p.cid===cid)||null;
   const total=cOrds.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.price*i.qty,0),0);
   archivedCustomers[cid]={customer:c,orders:cOrds,payment:pay,total,archivedAt:new Date().toISOString()};
   await saveAll(); renderCustomers(); renderPayments();
@@ -2441,7 +2441,7 @@ window.archiveTwoWeeks = async function() {
   if(!confirm(`封存 ${toArchive.length} 筆已出貨超過2週的訂單？`))return;
   toArchive.forEach(c=>{
     const cOrds=orders.filter(o=>o.cid===c.id);
-    const pay=payments.find(p=>p.cid===c.id);
+    const pay=payments.find(p=>p.cid===c.id)||null;
     const total=cOrds.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.price*i.qty,0),0);
     archivedCustomers[c.id]={customer:c,orders:cOrds,payment:pay,total,archivedAt:new Date().toISOString()};
   });
