@@ -2139,6 +2139,7 @@ let shippingState = {};
 let archivedProducts = {};
 let archivedCats = {}; // cat name -> true
 let collapsedCompleted = true;
+let shippedZoneOpen = false;
 let archivedShipping = {};
 let archivedOrders = [];
 let archivedCustomers = [];
@@ -2399,7 +2400,7 @@ function renderPayments() {
   const zone2=customers.filter(c=>!archivedCustomers[c.id]&&!isCustAllChecked(c)&&hasPay(c)); // 等待出貨：有付款+未全打勾
   const zone3=customers.filter(c=>!archivedCustomers[c.id]&&!isCustAllChecked(c)&&!hasPay(c)); // 其他帳款：沒付款+未全打勾
 
-  function custRow(c) {
+  function custRow(c, isShipped=false) {
     const cOrds=orders.filter(o=>o.cid===c.id);
     const total=cOrds.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.price*i.qty,0),0);
     const pay=payments.find(p=>p.cid===c.id);
@@ -2422,6 +2423,7 @@ function renderPayments() {
         <span class="tag tag-${c.source}">${c.source}</span>
         ${notified?'<span style="font-size:11px;color:var(--green)">✅已通知</span>':''}
         <button class="btn btn-sm" onclick="toggleEl('${uid}')" style="font-size:11px;padding:2px 7px;color:var(--text-secondary)">品項 ${allItems.length} ▾</button>
+        ${isShipped?`<button class="btn btn-sm" onclick="archiveCustomer('${c.id}')" style="font-size:11px;padding:2px 7px;color:var(--amber);border-color:var(--amber)"><i class="ti ti-archive"></i> 封存</button>`:''}
         <button class="btn btn-sm" onclick="openPayModal('${c.id}')" style="margin-left:auto;color:var(--pink);border-color:var(--pink);padding:3px 8px"><i class="ti ti-edit"></i></button>
       </div>
       <div id="${uid}" style="display:none;margin-top:6px;padding-top:4px">
@@ -2459,7 +2461,6 @@ function renderPayments() {
       </div>
     </div>`;
   }
-
   // 統計
   let grand=0,grandPaid=0,grandKrw=0,grandTwd=0;
   [...zone1,...zone2,...zone3].forEach(c=>{
@@ -2481,9 +2482,9 @@ function renderPayments() {
   const z1shipped=zone1.filter(c=>(shippingState[c.id]||{}).shipped);
   const z1rows=z1active.map(custRow).join('')+
     (z1shipped.length?`<div style="text-align:right;margin:4px 0">
-      <button class="btn btn-sm" style="font-size:11px;padding:2px 8px;color:var(--green);border-color:var(--green)" onclick="toggleEl('shipped-zone1')">已出貨 ${z1shipped.length} ▾</button>
+      <button class="btn btn-sm" style="font-size:11px;padding:2px 8px;color:var(--green);border-color:var(--green)" onclick="toggleShippedZone()">已出貨 ${z1shipped.length} ${shippedZoneOpen?'▴':'▾'}</button>
     </div>
-    <div id="shipped-zone1" style="display:none">${z1shipped.map(custRow).join('')}</div>`:'');
+    <div id="shipped-zone1" style="display:${shippedZoneOpen?'block':'none'}">${z1shipped.map(c=>custRow(c,true)).join('')}</div>`:'');
   const z2rows=zone2.map(custRow).join('');
   const z3rows=zone3.map(custRow).join('');
 
@@ -2510,6 +2511,19 @@ function renderPayments() {
     ${!zone1.length&&!zone2.length&&!zone3.length?'<div style="text-align:center;padding:40px;color:var(--text-tertiary)">還沒有客人</div>':''}
   `;
 }
+
+window.toggleShippedZone = function() {
+  shippedZoneOpen=!shippedZoneOpen;
+  renderPayments();
+};
+window.archiveCustomer = async function(cid) {
+  const c=customers.find(x=>x.id===cid); if(!c)return;
+  const cOrds=orders.filter(o=>o.cid===cid);
+  const pay=payments.find(p=>p.cid===cid);
+  const total=cOrds.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.price*i.qty,0),0);
+  archivedCustomers[cid]={customer:c,orders:cOrds,payment:pay,total,archivedAt:new Date().toISOString()};
+  await saveAll(); renderCustomers(); renderPayments();
+};
 
 window.archiveTwoWeeks = async function() {
   const twoWeeksAgo = new Date(Date.now() - 14*24*60*60*1000);
