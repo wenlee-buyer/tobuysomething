@@ -168,53 +168,262 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <div id="ledger-list"></div>
   </div>
 
-  <div id="page-settings" class="page" style="padding:16px">
-    <div class="page-header"><h1>設定</h1></div>
-  <div class="card">
-    <div style="font-weight:500;margin-bottom:4px">同步狀態</div>
-    <div id="settings-sync" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">載入中...</div>
-    <button class="btn btn-primary btn-block" onclick="forceSync()"><i class="ti ti-refresh"></i> 強制重新同步</button>
-  </div>
-  <div class="card" style="margin-top:8px">
-    <div style="font-weight:500;margin-bottom:6px">重置庫存數字</div>
-    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">把所有商品的「已買」和「配餘」歸零，讓你重新輸入正確數字</div>
-    <button class="btn btn-danger btn-block" onclick="resetAllStock()"><i class="ti ti-refresh"></i> 一鍵清零庫存</button>
-  </div>
-  <div class="card" style="margin-top:8px">
-    <div style="font-weight:500;margin-bottom:6px">遷移圖片到 Cloudinary</div>
-    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">把舊的 base64 圖片上傳到 Cloudinary，解決 Firebase 1MB 超限問題</div>
-    <button class="btn btn-primary btn-block" onclick="recompressAll()"><i class="ti ti-cloud-upload"></i> 立即遷移</button>
-  </div>
-  <div class="card" style="margin-top:8px">
-    <div style="font-weight:500;margin-bottom:6px">修改類別名稱</div>
-    <div style="display:flex;gap:6px;margin-bottom:8px">
-      <input type="text" id="cat-old" placeholder="原類別名稱" style="flex:1;margin:0">
-      <input type="text" id="cat-new" placeholder="新類別名稱" style="flex:1;margin:0">
+  <div id="page-settings" class="page" style="padding:0;background:#FFFCEC;min-height:100vh">
+    <!-- 設定頁專屬樣式 -->
+    <style>
+      #page-settings {
+        --s-bg: #FFFCEC;
+        --s-brown: #5B4B00;
+        --s-orange: #FF5809;
+        --s-card: rgba(91,75,0,0.04);
+        --s-border: rgba(91,75,0,0.10);
+        --s-text: #5B4B00;
+        --s-text-sub: rgba(91,75,0,0.55);
+        --s-text-light: rgba(91,75,0,0.35);
+        --s-orange-light: rgba(255,88,9,0.08);
+        --s-danger: #c0392b;
+        --s-danger-light: rgba(192,57,43,0.07);
+      }
+      #page-settings .s-header {
+        padding: 24px 20px 12px;
+        border-bottom: 0.5px solid var(--s-border);
+      }
+      #page-settings .s-header h1 {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--s-brown);
+        letter-spacing: 0.5px;
+      }
+      #page-settings .s-section {
+        margin: 0 16px 12px;
+      }
+      #page-settings .s-section-title {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--s-text-light);
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        padding: 16px 4px 6px;
+      }
+      #page-settings .s-card {
+        background: var(--s-card);
+        border: 0.5px solid var(--s-border);
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      #page-settings .s-row {
+        display: flex;
+        align-items: center;
+        padding: 13px 16px;
+        border-bottom: 0.5px solid var(--s-border);
+        gap: 12px;
+      }
+      #page-settings .s-row:last-child { border-bottom: none; }
+      #page-settings .s-row-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        flex-shrink: 0;
+        background: var(--s-orange-light);
+        color: var(--s-orange);
+      }
+      #page-settings .s-row-icon.danger {
+        background: var(--s-danger-light);
+        color: var(--s-danger);
+      }
+      #page-settings .s-row-icon.brown {
+        background: rgba(91,75,0,0.08);
+        color: var(--s-brown);
+      }
+      #page-settings .s-row-body { flex: 1; min-width: 0; }
+      #page-settings .s-row-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--s-text);
+      }
+      #page-settings .s-row-desc {
+        font-size: 11px;
+        color: var(--s-text-sub);
+        margin-top: 2px;
+        line-height: 1.4;
+      }
+      #page-settings .s-btn {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 14px;
+        border-radius: 20px;
+        border: none;
+        cursor: pointer;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        font-family: inherit;
+      }
+      #page-settings .s-btn-orange {
+        background: var(--s-orange);
+        color: #fff;
+      }
+      #page-settings .s-btn-outline {
+        background: transparent;
+        border: 1.5px solid var(--s-orange);
+        color: var(--s-orange);
+      }
+      #page-settings .s-btn-danger {
+        background: transparent;
+        border: 1.5px solid var(--s-danger);
+        color: var(--s-danger);
+      }
+      #page-settings .s-sync-dot {
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: #1D9E75;
+        display: inline-block;
+        margin-right: 5px;
+      }
+      #page-settings input.s-input {
+        background: rgba(91,75,0,0.04);
+        border: 0.5px solid rgba(91,75,0,0.15);
+        border-radius: 8px;
+        padding: 7px 10px;
+        font-size: 13px;
+        color: var(--s-text);
+        font-family: inherit;
+        width: 100%;
+      }
+      #page-settings input.s-input::placeholder { color: var(--s-text-light); }
+      #page-settings .s-cat-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        border-bottom: 0.5px solid var(--s-border);
+      }
+      #page-settings .s-cat-row:last-child { border-bottom: none; }
+      #page-settings .s-cat-badge {
+        font-size: 11px;
+        padding: 2px 10px;
+        border-radius: 20px;
+        font-weight: 500;
+      }
+      #page-settings .s-archive-item {
+        padding: 10px 16px;
+        border-bottom: 0.5px solid var(--s-border);
+        cursor: pointer;
+      }
+      #page-settings .s-archive-item:last-child { border-bottom: none; }
+    </style>
+
+    <div class="s-header">
+      <h1>設定</h1>
     </div>
-    <button class="btn btn-primary btn-block" onclick="renameCategory()"><i class="ti ti-edit"></i> 確認修改</button>
+
+    <!-- 同步 -->
+    <div class="s-section">
+      <div class="s-section-title">資料同步</div>
+      <div class="s-card">
+        <div class="s-row">
+          <div class="s-row-icon brown"><i class="ti ti-cloud"></i></div>
+          <div class="s-row-body">
+            <div class="s-row-label">同步狀態</div>
+            <div class="s-row-desc" id="settings-sync">載入中...</div>
+          </div>
+          <button class="s-btn s-btn-outline" onclick="forceSync()">同步</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 商品管理 -->
+    <div class="s-section">
+      <div class="s-section-title">商品管理</div>
+      <div class="s-card">
+        <div class="s-row">
+          <div class="s-row-icon"><i class="ti ti-cloud-upload"></i></div>
+          <div class="s-row-body">
+            <div class="s-row-label">遷移圖片到 Cloudinary</div>
+            <div class="s-row-desc">將舊 base64 圖片上傳，解決 Firebase 1MB 超限</div>
+          </div>
+          <button class="s-btn s-btn-orange" onclick="recompressAll()">遷移</button>
+        </div>
+        <div class="s-row">
+          <div class="s-row-icon brown"><i class="ti ti-database-plus"></i></div>
+          <div class="s-row-body">
+            <div class="s-row-label">匯入新商品</div>
+            <div class="s-row-desc">匯入楓之谷網咖商品（不重複）</div>
+          </div>
+          <button class="s-btn s-btn-outline" onclick="importNewProducts()">匯入</button>
+        </div>
+        <div class="s-row">
+          <div class="s-row-icon brown"><i class="ti ti-download"></i></div>
+          <div class="s-row-body">
+            <div class="s-row-label">匯出備份</div>
+            <div class="s-row-desc">下載所有資料為 JSON 備份檔</div>
+          </div>
+          <button class="s-btn s-btn-outline" onclick="exportData()">匯出</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 類別管理 -->
+    <div class="s-section">
+      <div class="s-section-title">類別管理</div>
+      <div class="s-card">
+        <div class="s-row">
+          <div class="s-row-icon brown"><i class="ti ti-tag"></i></div>
+          <div class="s-row-body">
+            <div class="s-row-label">修改類別名稱</div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <input type="text" id="cat-old" placeholder="原名稱" class="s-input" style="margin:0">
+              <input type="text" id="cat-new" placeholder="新名稱" class="s-input" style="margin:0">
+            </div>
+          </div>
+          <button class="s-btn s-btn-orange" onclick="renameCategory()" style="align-self:flex-end;margin-left:8px">改名</button>
+        </div>
+        <div class="s-row" style="flex-direction:column;align-items:flex-start;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px;width:100%">
+            <div class="s-row-icon brown"><i class="ti ti-archive"></i></div>
+            <div class="s-row-label">類別封存</div>
+          </div>
+          <div id="cat-archive-list" style="width:100%;padding:0 4px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 庫存 -->
+    <div class="s-section">
+      <div class="s-section-title">庫存管理</div>
+      <div class="s-card">
+        <div class="s-row">
+          <div class="s-row-icon danger"><i class="ti ti-refresh"></i></div>
+          <div class="s-row-body">
+            <div class="s-row-label">一鍵清零庫存</div>
+            <div class="s-row-desc">把所有已買和配餘歸零，同步記錄也清除</div>
+          </div>
+          <button class="s-btn s-btn-danger" onclick="resetAllStock()">清零</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 封存記錄 -->
+    <div class="s-section">
+      <div class="s-section-title">封存記錄</div>
+      <div class="s-card">
+        <div id="archive-list"></div>
+        <div class="s-row">
+          <div class="s-row-icon danger"><i class="ti ti-trash"></i></div>
+          <div class="s-row-body">
+            <div class="s-row-label">一鍵刪除全部封存</div>
+            <div class="s-row-desc">無法復原</div>
+          </div>
+          <button class="s-btn s-btn-danger" onclick="clearAllArchived()">刪除</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:24px"></div>
   </div>
-  <div class="card" style="margin-top:8px">
-    <div style="font-weight:500;margin-bottom:6px">類別封存</div>
-    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">封存後該類別商品不再顯示於加單，可隨時解除</div>
-    <div id="cat-archive-list"></div>
-  </div>
-  <div class="card" style="margin-top:8px">
-    <div style="font-weight:500;margin-bottom:6px">匯入新商品</div>
-    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">將本次新增的26項楓之谷網咖商品匯入資料庫（已有的商品不會重複）</div>
-    <button class="btn btn-primary btn-block" onclick="importNewProducts()"><i class="ti ti-database-plus"></i> 一鍵匯入新商品</button>
-  </div>
-  <div class="card" style="margin-top:8px">
-    <div style="font-weight:500;margin-bottom:6px">匯出備份</div>
-    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">將所有資料下載為 JSON 備份檔</div>
-    <button class="btn btn-primary btn-block" onclick="exportData()"><i class="ti ti-download"></i> 匯出資料</button>
-  </div>
-  <div class="card" style="margin-top:8px">
-    <div style="font-weight:500;margin-bottom:6px">📦 封存客人記錄</div>
-    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">已封存的客人訂單，可供查閱或一鍵清除</div>
-    <div id="archive-list"></div>
-    <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="clearAllArchived()"><i class="ti ti-trash"></i> 一鍵刪除全部封存</button>
-  </div>
-</div>
 </div><!-- end .app -->
 
 <div class="modal-overlay" id="modal-ledger">
