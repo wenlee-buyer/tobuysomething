@@ -1635,20 +1635,6 @@ window.saveCustomer = async function() {
 window.toggleCompletedCollapse = function() {
   collapsedCompleted=!collapsedCompleted; renderCustomers();
 };
-window.archiveCustomer = async function(cid) {
-  const c=customers.find(x=>x.id===cid);
-  const cOrds=orders.filter(o=>o.cid===cid);
-  const pay=payments.find(p=>p.cid===cid);
-  const total=cOrds.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.price*i.qty,0),0);
-  archivedCustomers[cid]={
-    customer:c,
-    orders:cOrds,
-    payment:pay,
-    total,
-    archivedAt:new Date().toISOString()
-  };
-  await saveAll(); renderCustomers(); renderPurchase(); renderPayments();
-};
 window.toggleNotified = async function(cid) {
   const idx=payments.findIndex(p=>p.cid===cid);
   if(idx>=0){payments[idx].notified=!payments[idx].notified;}
@@ -2265,88 +2251,6 @@ window.toggleCheck = function(el) {
   const b=el.querySelector(".check-box"); b.classList.toggle("checked");
   const s=el.querySelector("span"); if(s)s.style.textDecoration=b.classList.contains("checked")?"line-through":"";
 };
-
-function renderShipping() {
-  const el=document.getElementById("shipping-list");
-  if(!el)return;
-  const withShipping=customers.filter(c=>{
-    const pay=payments.find(p=>p.cid===c.id);
-    return pay&&pay.shipping&&(pay.shipping==="7-11"||pay.shipping==="全家");
-  });
-  if(!withShipping.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">還沒有客人選擇出貨方式</div>';return}
-
-  function custRow(c) {
-    const pay=payments.find(p=>p.cid===c.id);
-    const cOrds=orders.filter(o=>o.cid===c.id);
-    const total=cOrds.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.price*i.qty,0),0);
-    const paid=pay?pay.amount:0;
-    const discount=pay?pay.discount||0:0;
-    const remain=Math.max(0,total-discount-paid);
-    const st=shippingState[c.id]||{ordered:false,shipped:false};
-    const allItems=cOrds.flatMap(o=>o.items);
-    return `<div class="card" style="border-left:3px solid ${st.shipped?'var(--green)':st.ordered?'var(--amber)':'var(--border-strong)'}">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div>
-          <span style="font-weight:700;font-size:15px;color:var(--pink)">${c.code}</span>
-          <span class="tag tag-${c.source}" style="margin-left:8px">${c.source}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:14px;font-weight:700;color:${remain>0?'var(--red)':'var(--green)'}">${remain>0?'待付 NT$'+remain.toLocaleString():'已結清'}</span>
-          <button class="btn btn-sm" onclick="toggleShipDetail('${c.id}')" id="ship-btn-${c.id}" style="color:var(--pink);border-color:var(--pink)"><i class="ti ti-chevron-down"></i> 展開</button>
-        </div>
-      </div>
-      <div style="display:flex;gap:16px;margin-bottom:4px">
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:15px;font-weight:500">
-          <input type="checkbox" ${st.ordered?'checked':''} onchange="toggleShipping('${c.id}','ordered',this.checked)" style="width:24px;height:24px;cursor:pointer;accent-color:var(--amber);flex-shrink:0">
-          已開單
-        </label>
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:15px;font-weight:500">
-          <input type="checkbox" ${st.shipped?'checked':''} onchange="toggleShipping('${c.id}','shipped',this.checked)" style="width:24px;height:24px;cursor:pointer;accent-color:var(--green);flex-shrink:0">
-          已出貨
-        </label>
-      </div>
-      <div id="ship-detail-${c.id}" style="display:none;border-top:0.5px solid var(--border);padding-top:8px;margin-top:8px">
-        ${allItems.map(i=>{
-          const p=products.find(x=>x.id===i.pid);
-          const name=p?p.name:i.name;
-          return `<div class="item-row">
-            ${p&&p.img?`<img src="${p.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
-            <span style="flex:1;font-size:13px">${name}</span>
-            <span style="color:var(--text-secondary);font-size:12px">x${i.qty}</span>
-            <span style="font-weight:700;font-size:13px;margin-left:8px">NT$${(i.price*i.qty).toLocaleString()}</span>
-          </div>${i.note?`<div style="font-size:11px;color:var(--pink-dark);background:var(--pink-light);padding:2px 7px;border-radius:4px;margin-bottom:2px;margin-left:44px">💬 ${i.note}</div>`:''}`;
-        }).join('')}
-      </div>
-    </div>`;
-  }
-
-  const groups={'7-11':[],'全家':[]};
-  withShipping.forEach(c=>{
-    const pay=payments.find(p=>p.cid===c.id);
-    if(groups[pay.shipping])groups[pay.shipping].push(c);
-  });
-
-  let html='';
-  ['7-11','全家'].forEach(method=>{
-    const list=groups[method];
-    if(!list.length)return;
-    const active=list.filter(c=>{ const s=shippingState[c.id]||{}; return !(s.ordered&&s.shipped); });
-    const archived=list.filter(c=>{ const s=shippingState[c.id]||{}; return s.ordered&&s.shipped; });
-    const sorted=[
-      ...active.filter(c=>{ const s=shippingState[c.id]||{}; return !s.ordered; }),
-      ...active.filter(c=>{ const s=shippingState[c.id]||{}; return s.ordered&&!s.shipped; }),
-    ];
-    html+=`<div class="sec-title">📦 ${method}</div>
-      ${sorted.map(custRow).join('')}
-      ${archived.length?`<button class="btn btn-sm" style="width:100%;justify-content:center;color:var(--green);border-color:var(--green);margin-top:8px" onclick="document.getElementById('ship-archived-${method}').style.display=document.getElementById('ship-archived-${method}').style.display==='none'?'block':'none'">
-        <i class="ti ti-archive"></i> 已完成收納（${archived.length}）
-      </button>
-      <div id="ship-archived-${method}" style="display:none;margin-top:6px">
-        ${archived.map(custRow).join('')}
-      </div>`:''}`;
-  });
-  el.innerHTML=html;
-}
 
 window.toggleShipping = async function(cid, field, checked) {
   if(!shippingState[cid])shippingState[cid]={ordered:false,shipped:false};
