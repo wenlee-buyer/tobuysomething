@@ -2012,14 +2012,21 @@ function isCustAllCheckedGlobal(cid) {
   return cOrds.every(o=>o.items.every((_,idx)=>!!itemChecked[`${cid}_${o.id}_${idx}`]));
 }
 function getTotalNeeded(pid, variantName) {
+  const p=products.find(x=>x.id===pid);
+  const hasVariants=p&&p.variants&&p.variants.length;
   let total=0;
-  orders.filter(o=>!archivedCustomers[o.cid]&&!isCustAllCheckedGlobal(o.cid)).forEach(o=>o.items.forEach((item,idx)=>{
+  orders.filter(o=>!archivedCustomers[o.cid]).forEach(o=>o.items.forEach((item,idx)=>{
     if(item.pid!==pid)return;
     if(item.variants&&item.variants.length){
+      // 新格式
       const v=item.variants.find(x=>x.name===variantName);
       if(v)total+=v.qty;
-    } else {
+    } else if(hasVariants){
+      // 舊格式，商品有款式，note 是款式名
       if((item.note||"")===(variantName||""))total+=item.qty;
+    } else {
+      // 無款式商品：加總所有需求，不管 note
+      total+=item.qty;
     }
   }));
   return total;
@@ -2141,7 +2148,7 @@ function renderPurchase() {
   const el=document.getElementById("purchase-list");
 
   // 收集所有有效訂單（排除封存+全打勾客人）
-  const validOrders=orders.filter(o=>!archivedCustomers[o.cid]&&!isCustAllCheckedGlobal(o.cid));
+  const validOrders=orders.filter(o=>!archivedCustomers[o.cid]);
 
   // 以商品為單位計算缺口
   const byProduct={};
