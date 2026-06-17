@@ -2144,63 +2144,87 @@ let ledgerEntries = [];
 function renderPurchase() {
   const el=document.getElementById("purchase-list");
 
-  // 收集所有有效訂單（排除封存+全打勾客人）
-  const validOrders=orders.filter(o=>!archivedCustomers[o.cid]);
+  // 所有未封存訂單
+  const allOrders=orders.filter(o=>!archivedCustomers[o.cid]);
+  // 客人頁可見的訂單（未全打勾）
+  const pendingOrders=allOrders.filter(o=>!isCustAllCheckedGlobal(o.cid));
 
-  // 以商品為單位計算缺口
+  // helper: note 是否對應到商品的 variant
+  function noteMatchesVariant(p, note) {
+    if(!p||!p.variants||!p.variants.length)return false;
+    return p.variants.some(v=>v.name===note);
+  }
+
+  // 以商品為單位收集需求
   const byProduct={};
 
-  // 先收集每個商品的所有需求
-  validOrders.forEach(o=>o.items.forEach(item=>{
+  allOrders.forEach(o=>o.items.forEach(item=>{
     const p=products.find(x=>x.id===item.pid); if(!p||archivedProducts[p.id])return;
-    if(!byProduct[item.pid]) byProduct[item.pid]={p, variantNeeds:{}, noVariantNeeds:[], noVariantTotal:0};
+    if(!byProduct[item.pid]) byProduct[item.pid]={p, variantNeeds:{}, noteNeeds:[]};
+
     if(item.variants&&item.variants.length){
-      // 新格式：每個款式各自累計
+      // 新格式 variants → 有 variant，用 ordered 比對
       item.variants.forEach(v=>{
         byProduct[item.pid].variantNeeds[v.name]=(byProduct[item.pid].variantNeeds[v.name]||0)+v.qty;
       });
-    } else if(p.variants&&p.variants.length){
-      // 舊格式但商品有設款式：note 作為款式名稱
+    } else if(noteMatchesVariant(p, item.note||"")){
+      // 舊格式，note 對應到 variant → 用 ordered 比對
       const note=item.note||"";
       byProduct[item.pid].variantNeeds[note]=(byProduct[item.pid].variantNeeds[note]||0)+item.qty;
     } else {
-      // 舊格式/無款式：記錄備註和數量
-      byProduct[item.pid].noVariantNeeds.push({note:item.note||"",qty:item.qty});
-      byProduct[item.pid].noVariantTotal+=item.qty;
+      // note 對應不到 variant → 只算未全打勾客人
+      // 先不加，等下面用 pendingOrders 算
     }
   }));
 
-  // 計算每個商品的缺口
+  // note 對應不到 variant 的：只算未全打勾客人
+  pendingOrders.forEach(o=>o.items.forEach(item=>{
+    const p=products.find(x=>x.id===item.pid); if(!p||archivedProducts[p.id])return;
+    if(!byProduct[item.pid]) byProduct[item.pid]={p, variantNeeds:{}, noteNeeds:[]};
+    if(item.variants&&item.variants.length)return; // 新格式已處理
+    if(noteMatchesVariant(p, item.note||""))return; // 有對應 variant 已處理
+    // note 對應不到 variant
+    byProduct[item.pid].noteNeeds.push({note:item.note||"", qty:item.qty});
+  }));
+
+  // 計算缺口
   const byCat={};
-  Object.values(byProduct).forEach(({p, variantNeeds, noVariantNeeds, noVariantTotal})=>{
+  Object.values(byProduct).forEach(({p, variantNeeds, noteNeeds})=>{
     const shortageItems=[];
     let totalShortage=0;
 
+    // 有 variant 的款式：用 ordered 比對
     if(p.variants&&p.variants.length){
-      // 有款式：每款各自計算（包含舊格式用note記的款式）
       Object.entries(variantNeeds).forEach(([vName, needed])=>{
         const v=p.variants.find(x=>x.name===vName);
         const ordered=v?(v.ordered||0):0;
         const shortage=Math.max(0,needed-ordered);
-        if(shortage>0) shortageItems.push({label:vName, shortage});
-        totalShortage+=shortage;
+        if(shortage>0){shortageItems.push({label:vName, shortage}); totalShortage+=shortage;}
       });
-    } else {
-      // 無款式：所有備註共用 p.ordered，整體計算缺口
-      const ordered=p.ordered||0;
+    } else if(Object.keys(variantNeeds).length){
+      // 舊格式有對應 variant 的（商品有 variants 但用 note 記）
+      Object.entries(variantNeeds).forEach(([vName, needed])=>{
+        const v=p.variants?p.variants.find(x=>x.name===vName):null;
+        const ordered=v?(v.ordered||0):0;
+        const shortage=Math.max(0,needed-ordered);
+        if(shortage>0){shortageItems.push({label:vName, shortage}); totalShortage+=shortage;}
+      });
+    }
+
+    // note 對應不到 variant 的：直接列出（只要有需求就顯示）
+    if(noteNeeds.length){
+      // 合併相同 note
+      const merged={};
+      noteNeeds.forEach(n=>{merged[n.note]=(merged[n.note]||0)+n.qty;});
+      const noVariantTotal=Object.values(merged).reduce((s,v)=>s+v,0);
+      const ordered=(!p.variants||!p.variants.length)?(p.ordered||0):0;
       const shortage=Math.max(0,noVariantTotal-ordered);
       if(shortage>0){
-        // 按比例顯示各備註的缺口
-        if(noVariantNeeds.length===1||noVariantNeeds.every(n=>n.note==="")){
-          shortageItems.push({label:"", shortage});
-        } else {
-          // 把備註顯示出來讓你看清楚是哪些
-          noVariantNeeds.forEach(n=>{
-            if(n.note) shortageItems.push({label:n.note, shortage:n.qty, isNote:true});
-          });
-          shortageItems.push({label:"共缺", shortage, isSummary:true});
-        }
-        totalShortage=shortage;
+        Object.entries(merged).forEach(([note,qty])=>{
+          if(note) shortageItems.push({label:note, shortage:qty});
+        });
+        if(!Object.keys(merged).some(n=>n)) shortageItems.push({label:"", shortage:noVariantTotal});
+        totalShortage+=shortage;
       }
     }
 
@@ -2218,17 +2242,15 @@ function renderPurchase() {
   let html="";
   catOrder.filter(c=>byCat[c]&&byCat[c].length).forEach(cat=>{
     const rows=byCat[cat].map(({p,totalShortage,shortageItems})=>{
-      const variantLines=shortageItems.filter(s=>s.label&&!s.isSummary)
+      const variantLines=shortageItems.filter(s=>s.label)
         .map(s=>`<div style="font-size:12px;color:var(--text-secondary);margin-left:44px;padding:1px 0">└ ${s.label} ×${s.shortage}</div>`).join("");
-      const summaryLine=shortageItems.find(s=>s.isSummary)
-        ?`<div style="font-size:12px;color:var(--red);margin-left:44px;font-weight:600">共缺 ×${totalShortage}</div>`:"";
       return `<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
         <div style="display:flex;align-items:center;gap:8px">
           ${p.img?`<img src="${p.img}" class="thumb-sm" alt="">`:`<div class="thumb-sm-ph"><i class="ti ti-photo" style="font-size:14px;color:var(--text-tertiary)"></i></div>`}
           <span style="flex:1;font-size:13px">${p.name}</span>
           <span style="font-size:13px;font-weight:700;color:var(--red)">缺 ×${totalShortage}</span>
         </div>
-        ${variantLines}${summaryLine}
+        ${variantLines}
       </div>`;
     }).join("");
     html+=`<div class="sec-title">${CAT_EMOJI[cat]||""} ${cat}</div>
