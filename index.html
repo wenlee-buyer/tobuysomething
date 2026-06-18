@@ -175,8 +175,8 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
         --s-bg: #FFFCEC;
         --s-brown: #5B4B00;
         --s-orange: #FF5809;
-        --s-card: rgba(91,75,0,0.04);
-        --s-border: rgba(91,75,0,0.10);
+        --s-card: rgba(91,75,0,0.025);
+        --s-border: rgba(91,75,0,0.08);
         --s-text: #5B4B00;
         --s-text-sub: rgba(91,75,0,0.55);
         --s-text-light: rgba(91,75,0,0.35);
@@ -339,22 +339,8 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <div class="s-section">
       <div class="s-section-title">商品管理</div>
       <div class="s-card">
-        <div class="s-row">
-          <div class="s-row-icon"><i class="ti ti-cloud-upload"></i></div>
-          <div class="s-row-body">
-            <div class="s-row-label">遷移圖片到 Cloudinary</div>
-            <div class="s-row-desc">將舊 base64 圖片上傳，解決 Firebase 1MB 超限</div>
-          </div>
-          <button class="s-btn s-btn-orange" onclick="recompressAll()">遷移</button>
-        </div>
-        <div class="s-row">
-          <div class="s-row-icon brown"><i class="ti ti-database-plus"></i></div>
-          <div class="s-row-body">
-            <div class="s-row-label">匯入新商品</div>
-            <div class="s-row-desc">匯入楓之谷網咖商品（不重複）</div>
-          </div>
-          <button class="s-btn s-btn-outline" onclick="importNewProducts()">匯入</button>
-        </div>
+
+
         <div class="s-row">
           <div class="s-row-icon brown"><i class="ti ti-download"></i></div>
           <div class="s-row-body">
@@ -391,20 +377,7 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
       </div>
     </div>
 
-    <!-- 庫存 -->
-    <div class="s-section">
-      <div class="s-section-title">庫存管理</div>
-      <div class="s-card">
-        <div class="s-row">
-          <div class="s-row-icon danger"><i class="ti ti-refresh"></i></div>
-          <div class="s-row-body">
-            <div class="s-row-label">一鍵清零庫存</div>
-            <div class="s-row-desc">把所有已買和配餘歸零，同步記錄也清除</div>
-          </div>
-          <button class="s-btn s-btn-danger" onclick="resetAllStock()">清零</button>
-        </div>
-      </div>
-    </div>
+
 
     <!-- 封存記錄 -->
     <div class="s-section">
