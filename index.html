@@ -116,13 +116,17 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
 #page-settings .s2-header h1{font-size:26px;font-weight:800;color:#2D2208;letter-spacing:-0.5px;margin:0}
 #page-settings .s2-header p{font-size:11px;color:#C4AC92;margin:4px 0 0;letter-spacing:1px}
 #page-settings .s2-group{margin:0 16px 20px}
-#page-settings .s2-group-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#5B3800;padding:0 4px 8px;display:block}
-#page-settings .s2-card{background:#fff;border-radius:16px;box-shadow:0 1px 8px rgba(45,34,8,0.08),0 0 0 0.5px rgba(196,172,146,0.3);overflow:hidden;border-left:3px solid #C4AC92}
+#page-settings .s2-group-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#C4AC92;padding:0 4px 8px;display:block}
+#page-settings .s2-card{background:#fff;border-radius:16px;box-shadow:0 1px 8px rgba(45,34,8,0.08),0 0 0 0.5px rgba(196,172,146,0.3);overflow:hidden;border-left:3px solid #FF5809}
+#page-settings .s2-card.neutral{border-left-color:#C4AC92}
 #page-settings .s2-card.danger{border-left-color:#C0392B}
 #page-settings .s2-row{display:flex;align-items:center;padding:14px 16px;gap:14px;border-bottom:0.5px solid #EDE8DC}
 #page-settings .s2-row:last-child{border-bottom:none}
-#page-settings .s2-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;background:rgba(91,56,0,0.07);color:#5B3800}
+#page-settings .s2-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+#page-settings .s2-icon.orange{background:rgba(255,88,9,0.1);color:#FF5809}
+#page-settings .s2-icon.brown{background:rgba(45,34,8,0.07);color:#2D2208}
 #page-settings .s2-icon.danger{background:rgba(192,57,43,0.08);color:#C0392B}
+#page-settings .s2-icon.green{background:rgba(29,158,117,0.1);color:#1D9E75}
 #page-settings .s2-body{flex:1;min-width:0}
 #page-settings .s2-label{font-size:14px;font-weight:600;color:#2D2208;line-height:1.3}
 #page-settings .s2-desc{font-size:11px;color:#8C7B5E;margin-top:2px;line-height:1.5}
@@ -211,7 +215,7 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
       <div class="s2-group-label">資料</div>
       <div class="s2-card neutral">
         <div class="s2-row">
-          <div class="s2-icon"><i class="ti ti-cloud-check"></i></div>
+          <div class="s2-icon green"><i class="ti ti-cloud-check"></i></div>
           <div class="s2-body">
             <div class="s2-label">雲端同步</div>
             <div class="s2-desc" id="settings-sync">連線中...</div>
@@ -219,7 +223,7 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
           <button class="s2-btn ghost" onclick="forceSync()">同步</button>
         </div>
         <div class="s2-row">
-          <div class="s2-icon"><i class="ti ti-download"></i></div>
+          <div class="s2-icon brown"><i class="ti ti-download"></i></div>
           <div class="s2-body">
             <div class="s2-label">匯出備份</div>
             <div class="s2-desc">下載所有資料為 JSON 備份檔</div>
@@ -272,6 +276,87 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     </div>
 
     <div style="height:32px"></div>
+  </div>
+    <div class="s-header">
+      <h1>設定</h1>
+    </div>
+
+    <!-- 同步 -->
+    <div class="s-section">
+      <div class="s-section-title">資料同步</div>
+      <div class="s-card">
+        <div class="s-row">
+          <div class="s-row-icon brown"><i class="ti ti-cloud"></i></div>
+          <div class="s-row-body">
+            <div class="s-row-label">同步狀態</div>
+            <div class="s-row-desc" id="settings-sync">載入中...</div>
+          </div>
+          <button class="s-btn s-btn-outline" onclick="forceSync()">同步</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 商品管理 -->
+    <div class="s-section">
+      <div class="s-section-title">商品管理</div>
+      <div class="s-card">
+
+
+        <div class="s-row">
+          <div class="s-row-icon brown"><i class="ti ti-download"></i></div>
+          <div class="s-row-body">
+            <div class="s-row-label">匯出備份</div>
+            <div class="s-row-desc">下載所有資料為 JSON 備份檔</div>
+          </div>
+          <button class="s-btn s-btn-outline" onclick="exportData()">匯出</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 類別管理 -->
+    <div class="s-section">
+      <div class="s-section-title">類別管理</div>
+      <div class="s-card">
+        <div class="s-row">
+          <div class="s-row-icon brown"><i class="ti ti-tag"></i></div>
+          <div class="s-row-body">
+            <div class="s-row-label">修改類別名稱</div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <input type="text" id="cat-old" placeholder="原名稱" class="s-input" style="margin:0">
+              <input type="text" id="cat-new" placeholder="新名稱" class="s-input" style="margin:0">
+            </div>
+          </div>
+          <button class="s-btn s-btn-orange" onclick="renameCategory()" style="align-self:flex-end;margin-left:8px">改名</button>
+        </div>
+        <div class="s-row" style="flex-direction:column;align-items:flex-start;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px;width:100%">
+            <div class="s-row-icon brown"><i class="ti ti-archive"></i></div>
+            <div class="s-row-label">類別封存</div>
+          </div>
+          <div id="cat-archive-list" style="width:100%;padding:0 4px"></div>
+        </div>
+      </div>
+    </div>
+
+
+
+    <!-- 封存記錄 -->
+    <div class="s-section">
+      <div class="s-section-title">封存記錄</div>
+      <div class="s-card">
+        <div id="archive-list"></div>
+        <div class="s-row">
+          <div class="s-row-icon danger"><i class="ti ti-trash"></i></div>
+          <div class="s-row-body">
+            <div class="s-row-label">一鍵刪除全部封存</div>
+            <div class="s-row-desc">無法復原</div>
+          </div>
+          <button class="s-btn s-btn-danger" onclick="clearAllArchived()">刪除</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:24px"></div>
   </div>
 </div><!-- end .app -->
 
@@ -2305,6 +2390,16 @@ function renderPurchase() {
   catOrder.filter(c=>byCat[c]&&byCat[c].length).forEach(cat=>{
     const rows=byCat[cat].map(({p,totalShortage,shortageItems})=>{
       const variantLines=shortageItems.filter(s=>s.label)
+        .sort((a,b)=>{
+          // 依照商品庫 variants 的順序排列
+          if(!p.variants||!p.variants.length)return 0;
+          const ai=p.variants.findIndex(v=>v.name===a.label);
+          const bi=p.variants.findIndex(v=>v.name===b.label);
+          if(ai===-1&&bi===-1)return 0;
+          if(ai===-1)return 1;
+          if(bi===-1)return -1;
+          return ai-bi;
+        })
         .map(s=>`<div style="font-size:12px;color:var(--text-secondary);margin-left:44px;padding:1px 0">└ ${s.label} ×${s.shortage}</div>`).join("");
       return `<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
         <div style="display:flex;align-items:center;gap:8px">
