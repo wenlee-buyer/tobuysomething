@@ -1597,7 +1597,7 @@ function renderCustCatChips() {
   const cats=[...catSet];
   if(cats.length<=1){el.innerHTML="";return}
   el.innerHTML='<span class="chip'+(custCatFilter?'':' active')+'" onclick="setCustCatFilter(null)" style="font-size:11px;padding:4px 10px">全部</span>'
-    +cats.map(cat=>'<span class="chip'+(custCatFilter===cat?' active':'')+'" onclick="setCustCatFilter("'+cat+'")" style="font-size:11px;padding:4px 10px">'+(CAT_EMOJI[cat]||'📦')+' '+cat+'</span>').join('');
+    +cats.map(cat=>'<span class="chip'+(custCatFilter===cat?' active':'')+'" onclick="setCustCatFilter(\''+cat+'\')" style="font-size:11px;padding:4px 10px">'+(CAT_EMOJI[cat]||'📦')+' '+cat+'</span>').join('');
 }
 function renderCustomers() {
   const el=document.getElementById("cust-list");
