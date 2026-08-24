@@ -157,8 +157,10 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
 
   <div id="page-customers" class="page">
     <div class="page-header"><h1>客人管理</h1><button class="btn btn-sm btn-primary" onclick="openAddCustomer()"><i class="ti ti-plus"></i> 新增</button></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="cust-cat-chips"></div>
     <div id="cust-list"></div>
   </div>
+
 
   <div id="page-purchase" class="page">
     <div class="page-header"><h1>採購清單</h1></div>
@@ -1440,10 +1442,12 @@ function renderProducts() {
                 <div style="font-size:10px;color:var(--text-tertiary);text-align:center">配餘</div>
               </div>
               ${p.variants.map((v,vi)=>{
-                const vRemain=(v.ordered||0)-getTotalNeeded(p.id,v.name);
-                return `<div style="display:grid;grid-template-columns:1fr 60px 60px 42px;gap:4px;align-items:center;margin-bottom:3px">
+                const vNeeded=getTotalNeeded(p.id,v.name);
+                const vRemain=(v.ordered||0)-vNeeded;
+                const vShortage=vNeeded>0&&vRemain<0;
+                return `<div style="display:grid;grid-template-columns:1fr 60px 60px 42px;gap:4px;align-items:center;margin-bottom:3px;${vShortage?'background:rgba(226,75,74,0.06);border-radius:6px;padding:2px 4px;margin-left:-4px;margin-right:-4px':''}">
                   <div style="font-size:12px;min-width:0">
-                    <div style="word-break:break-all;line-height:1.3;margin-bottom:2px">${v.name}</div>
+                    <div style="word-break:break-all;line-height:1.3;margin-bottom:2px;color:${vShortage?'var(--red)':'inherit'}">${vShortage?'⚠️ ':''}${v.name}</div>
                     <input type="number" value="${v.ordered||0}" inputmode="numeric" style="width:40px;margin:0;padding:1px 3px;font-size:10px;text-align:center;color:var(--text-tertiary);border:0.5px dashed var(--border)" onchange="updateVariantStockField('${p.id}',${vi},'ordered_set',this.value)" title="點擊直接修改總量">
                   </div>
                   <input type="number" min="0" value="${v.stock||0}" inputmode="numeric" style="margin:0;padding:3px 4px;font-size:12px;text-align:center;width:100%" onchange="updateVariantStockField('${p.id}',${vi},'stock',this.value)">
@@ -1580,8 +1584,24 @@ window.delProduct = async function(id) {
 };
 
 // ── CUSTOMERS ──
+let custCatFilter = null;
+window.setCustCatFilter = function(cat) {
+  custCatFilter = (custCatFilter === cat) ? null : cat;
+  renderCustomers();
+};
+function renderCustCatChips() {
+  const el = document.getElementById("cust-cat-chips"); if(!el) return;
+  const vis = customers.filter(c=>!archivedCustomers[c.id]);
+  const catSet = new Set();
+  vis.forEach(c=>{ orders.filter(o=>o.cid===c.id).forEach(o=>{ o.items.forEach(i=>{ const p=products.find(x=>x.id===i.pid); if(p)catSet.add(p.cat); }); }); });
+  const cats=[...catSet];
+  if(cats.length<=1){el.innerHTML="";return}
+  el.innerHTML='<span class="chip'+(custCatFilter?'':' active')+'" onclick="setCustCatFilter(null)" style="font-size:11px;padding:4px 10px">全部</span>'
+    +cats.map(cat=>'<span class="chip'+(custCatFilter===cat?' active':'')+'" onclick="setCustCatFilter("'+cat+'")" style="font-size:11px;padding:4px 10px">'+(CAT_EMOJI[cat]||'📦')+' '+cat+'</span>').join('');
+}
 function renderCustomers() {
   const el=document.getElementById("cust-list");
+  renderCustCatChips();
   if(!customers.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">還沒有客人</div>';return}
 
   function isItemChecked(cid,oid,idx){ return !!itemChecked[`${cid}_${oid}_${idx}`]; }
@@ -1645,7 +1665,7 @@ function renderCustomers() {
               ${!isCompleted?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px" onclick="editItemNote('${o.id}',${idx},'${i.note.replace(/'/g,"\\'")}')"><i class="ti ti-edit"></i></button>`:''}
               ${!o.autoDeducted?(!syncedItems[`${o.id}_${idx}`]?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;color:var(--green);border-color:var(--green)" onclick="syncItemStock('${o.id}',${idx})" title="同步庫存">🔄</button>`:'<span style="font-size:10px;color:var(--green)">✓已同步</span>'):''}
             </div>`:`<div style="display:flex;align-items:center;gap:4px;margin-top:2px;margin-left:44px">
-              ${i.variants&&i.variants.length?`<div style="width:100%">${i.variants.map(v=>`<div style="font-size:11px;color:var(--text-secondary);padding:1px 0">└ ${v.name} x${v.qty}</div>`).join('')}</div>`:''}
+              ${i.variants&&i.variants.length?`<div style="width:100%">${i.variants.map(v=>{const vAlloc=getAllocatedQty(o.id,idx,i.pid,v.name);const vShort=!checked&&vAlloc<v.qty;return`<div style="font-size:11px;padding:1px 0;color:${vShort?'var(--red)':'var(--text-secondary)'}${vShort?';font-weight:600':''}">${vShort?'⚠️ ':''} └ ${v.name} x${v.qty}${vShort?` (缺${v.qty-vAlloc})`:''}  </div>`;}).join('')}</div>`:''}
               ${!isCompleted&&!i.variants?.length?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;color:var(--text-tertiary)" onclick="editItemNote('${o.id}',${idx},'')"><i class="ti ti-message-plus"></i> 加備註</button>`:''}
               ${!o.autoDeducted?(!syncedItems[`${o.id}_${idx}`]?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;color:var(--green);border-color:var(--green)" onclick="syncItemStock('${o.id}',${idx})" title="同步庫存">🔄</button>`:'<span style="font-size:10px;color:var(--green)">✓已同步</span>'):''}
             </div>`}
@@ -1667,7 +1687,10 @@ function renderCustomers() {
     return isCustCompleted(c); // 全打勾就移到帳款出貨，不管有沒有付款
   }
 
-  const visible=customers.filter(c=>!archivedCustomers[c.id]&&!isMovedToPayment(c));
+  let visible=customers.filter(c=>!archivedCustomers[c.id]&&!isMovedToPayment(c));
+  if(custCatFilter){
+    visible=visible.filter(c=>orders.filter(o=>o.cid===c.id).some(o=>o.items.some(i=>{const p=products.find(x=>x.id===i.pid);return p&&p.cat===custCatFilter;})));
+  }
 
   el.innerHTML=visible.length
     ? visible.map(c=>renderCustCard(c,false)).join("")
