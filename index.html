@@ -187,6 +187,8 @@ label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px
     <button class="nav-btn" onclick="showPage('settings',this)"><i class="ti ti-settings"></i>設定</button>
   </nav>
 
+  <button id="scroll-bottom-btn" onclick="window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})" style="display:none;position:fixed;right:16px;bottom:88px;z-index:200;width:40px;height:40px;border-radius:50%;background:var(--pink);color:#fff;border:none;box-shadow:0 2px 12px rgba(212,83,126,0.4);cursor:pointer;font-size:20px;align-items:center;justify-content:center;padding:0"><i class="ti ti-chevrons-down"></i></button>
+
   <div id="page-ledger" class="page" style="padding:16px">
     <div class="page-header">
       <h1>記帳</h1>
@@ -1371,8 +1373,26 @@ function showPage(id, btn) {
   if(id==="payment") renderPayments();
   if(id==="ledger") renderLedger();
   if(id==="settings") { renderArchiveList(); renderCatArchiveList(); }
+  // 只有客人頁顯示捲動按鈕
+  currentPage = id;
+  updateScrollBtn(id);
 }
 window.showPage = showPage;
+
+function updateScrollBtn(pageId) {
+  const btn = document.getElementById("scroll-bottom-btn");
+  if(!btn) return;
+  const show = (pageId||currentPage) === "customers";
+  btn.style.display = show ? "flex" : "none";
+}
+let currentPage = "customers";
+window.addEventListener("scroll", () => {
+  const btn = document.getElementById("scroll-bottom-btn");
+  if(!btn) return;
+  const nearBottom = window.scrollY + window.innerHeight >= document.body.scrollHeight - 80;
+  if(nearBottom) btn.style.display = "none";
+  else if(currentPage === "customers" && window.scrollY > 200) btn.style.display = "flex";
+});
 
 function getCats() {
   const fixed=["樂天世界商品","楓之谷網咖","快閃店","其他"];
