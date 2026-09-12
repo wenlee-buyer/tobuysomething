@@ -1732,7 +1732,15 @@ function calcAllocation(pid, variantName) {
       } else {
         // 舊格式 or 無款式
         const itemNote = item.note||"";
-        if(itemNote === (variantName||"")) entries.push({oid:o.id, itemIdx, variantName:itemNote, qty:item.qty, ts});
+        const p2 = products.find(x=>x.id===pid);
+        const hasVariants = p2&&p2.variants&&p2.variants.length;
+        if(hasVariants){
+          // 有款式商品用note記：只匹配對應款式
+          if(itemNote === (variantName||"")) entries.push({oid:o.id, itemIdx, variantName:itemNote, qty:item.qty, ts});
+        } else {
+          // 無款式商品：不管note，全部都計入
+          entries.push({oid:o.id, itemIdx, variantName:"", qty:item.qty, ts});
+        }
       }
     });
   });
@@ -2220,7 +2228,7 @@ function renderPurchase() {
 
   allOrders.forEach(o=>o.items.forEach(item=>{
     const p=products.find(x=>x.id===item.pid); if(!p||archivedProducts[p.id])return;
-    if(!byProduct[item.pid]) byProduct[item.pid]={p, variantNeeds:{}, noteNeeds:[]};
+    if(!byProduct[item.pid]) byProduct[item.pid]={p, variantNeeds:{}, noteNeeds:[], noVariantTotal:0};
 
     if(item.variants&&item.variants.length){
       // 新格式 variants → 有 variant，用 ordered 比對
@@ -2232,19 +2240,12 @@ function renderPurchase() {
       const note=item.note||"";
       byProduct[item.pid].variantNeeds[note]=(byProduct[item.pid].variantNeeds[note]||0)+item.qty;
     } else {
-      // note 對應不到 variant → 只算未全打勾客人
-      // 先不加，等下面用 pendingOrders 算
+      // 無款式商品：不管note，全部加總
+      if(!p.variants||!p.variants.length){
+        byProduct[item.pid].noVariantTotal=(byProduct[item.pid].noVariantTotal||0)+item.qty;
+        byProduct[item.pid].noteNeeds.push({note:item.note||"", qty:item.qty});
+      }
     }
-  }));
-
-  // note 對應不到 variant 的：只算未全打勾客人
-  pendingOrders.forEach(o=>o.items.forEach(item=>{
-    const p=products.find(x=>x.id===item.pid); if(!p||archivedProducts[p.id])return;
-    if(!byProduct[item.pid]) byProduct[item.pid]={p, variantNeeds:{}, noteNeeds:[]};
-    if(item.variants&&item.variants.length)return; // 新格式已處理
-    if(noteMatchesVariant(p, item.note||""))return; // 有對應 variant 已處理
-    // note 對應不到 variant
-    byProduct[item.pid].noteNeeds.push({note:item.note||"", qty:item.qty});
   }));
 
   // 計算缺口
