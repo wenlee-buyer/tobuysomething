@@ -2283,7 +2283,7 @@ function renderPurchase() {
         Object.entries(merged).forEach(([note,qty])=>{
           if(note) shortageItems.push({label:note, shortage:qty});
         });
-        if(!Object.keys(merged).some(n=>n)) shortageItems.push({label:"", shortage:noVariantTotal});
+        if(!Object.keys(merged).some(n=>n)) shortageItems.push({label:"", shortage:shortage});
         totalShortage+=shortage;
       }
     }
