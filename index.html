@@ -1635,11 +1635,9 @@ function renderCustomers() {
             ${i.note?`<div style="display:flex;align-items:center;gap:4px;margin-top:2px;margin-left:44px">
               <div style="font-size:11px;color:var(--pink-dark);background:var(--pink-light);padding:2px 7px;border-radius:4px;flex:1">💬 ${i.note}</div>
               ${!isCompleted?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px" onclick="editItemNote('${o.id}',${idx},'${i.note.replace(/'/g,"\\'")}')"><i class="ti ti-edit"></i></button>`:''}
-              ${!o.autoDeducted?(!syncedItems[`${o.id}_${idx}`]?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;color:var(--green);border-color:var(--green)" onclick="syncItemStock('${o.id}',${idx})" title="同步庫存">🔄</button>`:'<span style="font-size:10px;color:var(--green)">✓已同步</span>'):''}
             </div>`:`<div style="display:flex;align-items:center;gap:4px;margin-top:2px;margin-left:44px">
               ${i.variants&&i.variants.length?`<div style="width:100%">${i.variants.map(v=>{const vAlloc=getAllocatedQty(o.id,idx,i.pid,v.name);const vShort=!checked&&vAlloc<v.qty;return`<div style="font-size:11px;padding:1px 0;color:${vShort?'var(--red)':'var(--text-secondary)'}${vShort?';font-weight:600':''}">${vShort?'⚠️ ':''} └ ${v.name} x${v.qty}${vShort?` (缺${v.qty-vAlloc})`:''}  </div>`;}).join('')}</div>`:''}
               ${!isCompleted&&!i.variants?.length?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;color:var(--text-tertiary)" onclick="editItemNote('${o.id}',${idx},'')"><i class="ti ti-message-plus"></i> 加備註</button>`:''}
-              ${!o.autoDeducted?(!syncedItems[`${o.id}_${idx}`]?`<button class="btn btn-sm" style="padding:2px 6px;font-size:11px;color:var(--green);border-color:var(--green)" onclick="syncItemStock('${o.id}',${idx})" title="同步庫存">🔄</button>`:'<span style="font-size:10px;color:var(--green)">✓已同步</span>'):''}
             </div>`}
           </div>`;
         }).join("")).join("")}
@@ -1808,20 +1806,7 @@ window.editItemNote = async function(oid, idx, currentNote) {
     await saveAll(); renderCustomers();
   }
 };
-window.syncItemStock = async function(oid, idx) {
-  const o=orders.find(x=>x.id===oid); if(!o)return;
-  const item=o.items[idx]; if(!item)return;
-  const p=products.find(x=>x.id===item.pid);
-  if(!p){alert("找不到商品，請確認商品庫");return}
-  if(p.variants&&p.variants.length&&item.note) {
-    const v=p.variants.find(x=>x.name===item.note);
-    if(!v){alert(`找不到款式「${item.note}」，請先在商品庫設定款式`);return}
-  }
-  adjustAllocated(item.pid, item.note||"", item.qty);
-  syncedItems[`${oid}_${idx}`]=true;
-  await saveAll();
-  renderCustomers(); renderProducts();
-};
+
 function openItemNoteModal(oid, idx, currentNote, variants) {
   const existing=document.getElementById("modal-item-note");
   if(existing)existing.remove();
@@ -1836,7 +1821,7 @@ function openItemNoteModal(oid, idx, currentNote, variants) {
       <option value="">— 不指定 —</option>
       ${variants.map(v=>`<option value="${v.name}" ${currentNote===v.name?'selected':''}>${v.name}（配${v.ordered||0}）</option>`).join('')}
     </select>
-    <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:12px">改款式後，按備註旁的 🔄 才會同步扣庫存</div>
+    
     <div style="display:flex;gap:8px">
       <button class="btn" style="flex:1" onclick="document.getElementById('modal-item-note').remove()">取消</button>
       <button class="btn btn-primary" style="flex:1" onclick="saveItemNote('${oid}',${idx})">儲存</button>
@@ -2118,7 +2103,7 @@ window.initProductStock = async function(pid) {
   await saveAll(); renderProducts();
 };
 
-// adjustAllocated: 加單+qty, 刪單/退回-qty, 🔄同步+qty
+// adjustAllocated: 加單+qty, 刪單/退回-qty
 function adjustOrdered(pid, variantName, delta) {
   const p=products.find(x=>x.id===pid); if(!p)return;
   if(variantName&&p.variants&&p.variants.length){
@@ -2228,7 +2213,7 @@ function renderPurchase() {
 
   allOrders.forEach(o=>o.items.forEach(item=>{
     const p=products.find(x=>x.id===item.pid); if(!p||archivedProducts[p.id])return;
-    if(!byProduct[item.pid]) byProduct[item.pid]={p, variantNeeds:{}, noteNeeds:[], noVariantTotal:0};
+    if(!byProduct[item.pid]) byProduct[item.pid]={p, variantNeeds:{}, noteNeeds:[]};
 
     if(item.variants&&item.variants.length){
       // 新格式 variants → 有 variant，用 ordered 比對
@@ -2239,13 +2224,18 @@ function renderPurchase() {
       // 舊格式，note 對應到 variant → 用 ordered 比對
       const note=item.note||"";
       byProduct[item.pid].variantNeeds[note]=(byProduct[item.pid].variantNeeds[note]||0)+item.qty;
-    } else {
-      // 無款式商品：不管note，全部加總
-      if(!p.variants||!p.variants.length){
-        byProduct[item.pid].noVariantTotal=(byProduct[item.pid].noVariantTotal||0)+item.qty;
-        byProduct[item.pid].noteNeeds.push({note:item.note||"", qty:item.qty});
-      }
     }
+    // 無款式商品：等下面用 pendingOrders 算（包含所有note）
+  }));
+
+  // 無款式商品：只看客人頁pending的訂單，但不管note內容全部計入
+  pendingOrders.forEach(o=>o.items.forEach(item=>{
+    const p=products.find(x=>x.id===item.pid); if(!p||archivedProducts[p.id])return;
+    if(!byProduct[item.pid]) byProduct[item.pid]={p, variantNeeds:{}, noteNeeds:[]};
+    if(item.variants&&item.variants.length)return; // 新格式已處理
+    if(noteMatchesVariant(p, item.note||""))return; // 有對應 variant 已處理
+    // 無款式商品：不管note，全部計入
+    byProduct[item.pid].noteNeeds.push({note:item.note||"", qty:item.qty});
   }));
 
   // 計算缺口
