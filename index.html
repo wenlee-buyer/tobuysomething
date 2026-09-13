@@ -2228,13 +2228,24 @@ function renderPurchase() {
     // 無款式商品：等下面用 pendingOrders 算（包含所有note）
   }));
 
-  // 無款式商品：只看客人頁pending的訂單，但不管note內容全部計入
-  pendingOrders.forEach(o=>o.items.forEach(item=>{
+  // 無款式商品：未打勾需求 vs 可用庫存（ordered 扣掉已打勾用掉的）
+  const checkedUsed={};
+  allOrders.forEach(o=>o.items.forEach((item,idx)=>{
+    const p=products.find(x=>x.id===item.pid); if(!p||archivedProducts[p.id])return;
+    if(item.variants&&item.variants.length)return;
+    if(noteMatchesVariant(p, item.note||""))return;
+    if(itemChecked[`${o.cid}_${o.id}_${idx}`]){
+      checkedUsed[item.pid]=(checkedUsed[item.pid]||0)+item.qty;
+    }
+  }));
+
+  allOrders.forEach(o=>o.items.forEach((item,idx)=>{
     const p=products.find(x=>x.id===item.pid); if(!p||archivedProducts[p.id])return;
     if(!byProduct[item.pid]) byProduct[item.pid]={p, variantNeeds:{}, noteNeeds:[]};
     if(item.variants&&item.variants.length)return; // 新格式已處理
     if(noteMatchesVariant(p, item.note||""))return; // 有對應 variant 已處理
-    // 無款式商品：不管note，全部計入
+    // 已打勾的品項＝已備好貨，不列入採購需求
+    if(itemChecked[`${o.cid}_${o.id}_${idx}`])return;
     byProduct[item.pid].noteNeeds.push({note:item.note||"", qty:item.qty});
   }));
 
@@ -2268,7 +2279,8 @@ function renderPurchase() {
       const merged={};
       noteNeeds.forEach(n=>{merged[n.note]=(merged[n.note]||0)+n.qty;});
       const noVariantTotal=Object.values(merged).reduce((s,v)=>s+v,0);
-      const ordered=(!p.variants||!p.variants.length)?(p.ordered||0):0;
+      // 可用庫存 = 已買總量 − 已打勾品項用掉的
+      const ordered=(!p.variants||!p.variants.length)?Math.max(0,(p.ordered||0)-(checkedUsed[p.id]||0)):0;
       const shortage=Math.max(0,noVariantTotal-ordered);
       if(shortage>0){
         Object.entries(merged).forEach(([note,qty])=>{
